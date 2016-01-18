@@ -1,27 +1,25 @@
 import os
 import sys
-from PIL import Image
-from sklearn.cross_validation import KFold
 from sklearn.metrics import confusion_matrix
 from skimage.color import label2rgb
-from skimage import io
-from skimage.io import ImageCollection, imsave
+from skimage.io import imsave
 from config_datasets import color_list_datasets
 import numpy as np
 import theano
 
 floatX = theano.config.floatX
 
-# ############################# Batch iterator ###############################
-# This is just a simple helper function iterating over training data in
-# mini-batches of a particular size, optionally in random order. It assumes
-# data is available as numpy arrays. For big datasets, you could load numpy
-# arrays as memory-mapped files (np.load(..., mmap_mode='r')), or write your
-# own custom data iteration function. For small datasets, you can also copy
-# them to GPU at once for slightly improved performance. This would involve
-# several changes in the main program, though, and is not demonstrated here.
 
 def iterate_minibatches(inputs, targets, batchsize, shuffle=False):
+    '''Batch iterator
+    This is just a simple helper function iterating over training data in
+    mini-batches of a particular size, optionally in random order. It assumes
+    data is available as numpy arrays. For big datasets, you could load numpy
+    arrays as memory-mapped files (np.load(..., mmap_mode='r')), or write your
+    own custom data iteration function. For small datasets, you can also copy
+    them to GPU at once for slightly improved performance. This would involve
+    several changes in the main program, though, and is not demonstrated here.
+    '''
     assert len(inputs) == len(targets)
     if shuffle:
         indices = np.arange(len(inputs))
@@ -46,45 +44,67 @@ def save_image(outpath, img):
 
 
 def validate(f_pred,
-              data,
-              batchsize,
-              nclasses=2,
-              shuffle='False',
-              dataset='camvid',
-              saveto='test_lasagne',
-              mean=None, std=None, fullmasks=None,
-              void_is_present=True, save_seg=True,
-              filenames=None, folder_dataset='pred'):
-    """
-    :param f_pred: theano function that make the prediction
-    :param options: the hyper-parameters of the model
-    :param data:
-    :param mean:
-    :param std:
-    :param iterator:
-    :param fullmasks:
-    :param nclasses:
-    :param void_is_present: in some dataset there are some unlabeled pixels
-                            that we don't consider in the evalution metrics
-    :param save_seg: bool, save or not the predicted segmentation masks
-    :param filenames:
-    :param folder_dataset: where to save the segmentation mask
-                           e.g choose one btw 'train', 'test', 'valid'
-    :return: the function returns the following performance indexes computed
-             on the inout dataset:
-               Global Pixel Accuracy
-               Confusion Matrix
-               Normalized Confusion Matrix
-               Mean Class Accuracy (Mean of the diagonal of Norm Conf Matrix)
-               Intersection Over Union Indexes for each class
-               Intersection Over Union Index
-    """
+             data,
+             batchsize,
+             nclasses=2,
+             shuffle='False',
+             dataset='camvid',
+             saveto='test_lasagne',
+             mean=None, std=None, fullmasks=None,
+             void_is_present=True, save_seg=True,
+             filenames=None, folder_dataset='pred'):
+    """validate
 
+    Parameters
+    ----------
+    f_pred :
+        The theano function that make the prediction
+    data :
+        The
+    batchsize :
+        The
+    nclasses :
+        The
+    shuffle :
+        The
+    dataset :
+        The
+    saveto :
+        The
+    mean :
+        The
+    std :
+        The
+    fullmasks :
+        The
+    void_is_present :
+        In some dataset there are some unlabeled pixels that we don't consider
+        in the evalution metrics
+    save_seg :
+        If True the predicted segmentation mask will be saved
+    filenames :
+        The
+    folder_dataset :
+        Where to save the segmentation masks. Has to be either 'train',
+        'valid' or 'test'
+
+    Returns
+    -------
+    The function returns the following performance indexes computed on the
+    inout dataset:
+        * Global Pixel Accuracy
+        * Confusion Matrix
+        * Normalized Confusion Matrix
+        * Mean Class Accuracy (Mean of the diagonal of Norm Conf Matrix)
+        * Intersection Over Union Indexes for each class
+        * Intersection Over Union Index
+    """
     print >>sys.stderr, 'Prediction: ',
 
     if save_seg:
         name = dataset
-        seg_path = os.path.join('segmentations', name, saveto.split('/')[-1][:-4])
+        seg_path = os.path.join('segmentations', name,
+                                saveto.split('/')[-1][:-4])
         # gt_path = os.path.join('gt', name, saveto.split('/')[-1][:-4])
         # img_path = os.path.join('img', name, saveto.split('/')[-1][:-4])
         color_list = color_list_datasets[name]

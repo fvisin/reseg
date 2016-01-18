@@ -1,21 +1,27 @@
-import time
+# Standard library imports
 import cPickle as pkl
-import numpy as np
-import theano
-import theano.tensor as T
-from theano.sandbox.rng_mrg import MRG_RandomStreams as RandomStreams
-import lasagne
-from layers import buildReSeg
+import matplotlib.pyplot as plt
+import os
+import sys
+import time
 
-from utils import *
-from get_info_model import print_params
-from subprocess import check_output
+# Related third party imports
+import lasagne
+import numpy as np
 from skimage.data import load
 from skimage.color import label2rgb
-from config_datasets import color_list_datasets
-import matplotlib.pyplot as plt
+import theano
+from theano.sandbox.rng_mrg import MRG_RandomStreams as RandomStreams
 
-# DATASET IMPORT
+# Local application/library specific imports
+from config_datasets import color_list_datasets
+from get_info_model import print_params
+from layers import buildReSeg
+from subprocess import check_output
+from utils import iterate_minibatches, validate
+
+# Datasets import
+# TODO these should go into preprocess/helper dataset
 import camvid
 import daimler
 import kitti_road
@@ -272,11 +278,11 @@ def train(
     # How often should we check the output?
     # Now we want to check at each epoch so we check after
     # batch_size minibatchs train iterations
-    
+
     if validFreq == -1:
         validFreq = len(x_train)
     if saveFreq == -1:
-        saveFreq = len(x_train) 
+        saveFreq = len(x_train)
 
     filenames_train, filenames_valid, filenames_test = filenames
     cheight, cwidth, cchannels = x_train[0].shape
@@ -286,7 +292,7 @@ def train(
     print("Building model ...")
 
     input_shape = (batch_size, cheight, cwidth, cchannels)
-    
+
     out_layer, f_pred, f_train = buildReSeg(input_shape,
                                             n_layers,
                                             pheight,
@@ -420,8 +426,7 @@ def train(
                                            test_conf_matrix_norm,
                                            train_conf_matrix,
                                            valid_conf_matrix,
-                                           test_conf_matrix,
-                                            ])
+                                           test_conf_matrix])
 
                 history_iou_index.append([train_iou_index,
                                          valid_iou_index,
@@ -451,8 +456,7 @@ def train(
                                       filenames=filenames_train,
                                       folder_dataset='train',
                                       dataset=dataset,
-                                      saveto=saveto,
-                                      )
+                                      saveto=saveto)
 
     (valid_global_acc,
      valid_conf_matrix,
@@ -465,8 +469,7 @@ def train(
                                       filenames=filenames_valid,
                                       folder_dataset='valid',
                                       dataset=dataset,
-                                      saveto=saveto,
-                                      )
+                                      saveto=saveto)
     (test_global_acc,
      test_conf_matrix,
      test_conf_matrix_norm,
@@ -476,8 +479,7 @@ def train(
                                      batch_size, nclasses,
                                      filenames=filenames_test,
                                      folder_dataset='test',
-                                     saveto=saveto,
-                                     )
+                                     saveto=saveto)
 
     print("")
     print("Global Accuracies :")
@@ -626,7 +628,3 @@ if __name__ == '__main__':
         mode = 'sequential'
 
     show_seg(dataset_name, n_exp, dataset_set)
-
-
-
-
