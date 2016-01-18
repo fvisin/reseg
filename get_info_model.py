@@ -42,7 +42,7 @@ def print_params(fp, print_commit_hash=False, plot=False,
 
     # they're already accuracies
     if len(errs):
-        min_valid = numpy.argmax(errs[:, 8])
+        min_valid = numpy.argmax(errs[:, 3])
         best = errs[min_valid]
         best_test_class_acc = numpy.round(numpy.diagonal(conf_matrices[
                                                                  min_valid][

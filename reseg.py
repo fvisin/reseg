@@ -376,20 +376,16 @@ def train(
                                                  saveto=saveto,
                                                  )
 
-                valid_err = 1 - valid_global_acc
-                test_err = 1 - test_global_acc
+                # TODO:
+                # here we can also use other performance index to early stop
+                # e.g Mean IoU, Mean Class Accuracy
+                # we can think of a parameter to decide
 
-                # save the best params for test and validation set
+                valid_err = 1 - valid_global_acc
+                # save the best params
                 if (len(history_errs) == 0 or valid_err <= 1 - np.array(
                         history_errs)[:, 3].min()):
-                    np.savez(saveto.replace('.npz', '_valid.npz'),
-                             *lasagne.layers.get_all_param_values(
-                                     out_layer))
-
-                if (len(history_errs) == 0 or test_err <= 1 - np.array(
-                        history_errs)[:, 6].min()):
-                    np.savez(saveto.replace('.npz', '_test.npz'),
-                             *lasagne.layers.get_all_param_values(
+                    np.savez(saveto, *lasagne.layers.get_all_param_values(
                                      out_layer))
 
                 print("")
