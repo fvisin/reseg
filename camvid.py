@@ -13,12 +13,13 @@ from skimage.io import ImageCollection, imsave
 from skimage.transform import resize
 from itertools import izip
 
+from config_datasets import (color_list_datasets as colors_list)
 from helper_dataset import zero_pad, \
     compare_mask_image_filenames, convert_RGB_mask_to_index, \
     rgb2illumination_invariant, save_image
 
 
-N_DEBUG = 5
+N_DEBUG = -5
 DEBUG_SAVE_IMG = False
 DEBUG_SAVE_MASK = False
 
@@ -102,9 +103,10 @@ def load_images(img_path, gt_path, colors, load_greylevel_mask=False,
 
         if DEBUG_SAVE_MASK:
             outpath = inpath.replace('gt', 'debug_gt')
-            color_list = np.asarray(
-                [z[0] for z in zip(*colors.items())[1]]) / 255.
-            save_image(outpath, label2rgb(mask, colors=color_list))
+            outpath = inpath.replace('annot', 'debug_annot')
+            print np.unique(mask)
+
+            save_image(outpath, label2rgb(mask, colors=colors_list['camvid']))
 
         masks.append(mask)
 
@@ -221,17 +223,19 @@ def load_dataset_camvid(path, load_greylevel_mask=False, classes='subset_11',
         img_val_path, gt_val_path, camvid_colors, load_greylevel_mask,
         resize_images, resize_size, save, color_space)
 
-    return img_train, mask_train, filenames_train, img_test, mask_test, \
-        filenames_test, img_val, mask_val, filenames_val
+    return (img_train, mask_train, filenames_train,
+            img_test, mask_test, filenames_test,
+            img_val, mask_val, filenames_val)
 
 
 def load_dataset_camvid_segnet(path):
     img_train_path = os.path.join(path, 'train')
+    img_valid_path = os.path.join(path, 'valid')
     img_test_path = os.path.join(path, 'test')
 
     gt_train_path = os.path.join(path, 'trainannot')
+    gt_valid_path = os.path.join(path, 'validannot')
     gt_test_path = os.path.join(path, 'testannot')
-
 
     camvid_colors = OrderedDict([
         ("Sky", np.array([128, 128, 128], dtype=np.uint8)),
@@ -252,25 +256,32 @@ def load_dataset_camvid_segnet(path):
     img_train, mask_train, filenames_train = load_images(
         img_train_path, gt_train_path, camvid_colors, load_greylevel_mask=True,
         save=False)  # load_greylevel_mask=True by default because it's grey
+
+    print "Processing Camvid SegNet valid dataset..."
+    img_valid, mask_valid, filenames_valid = load_images(
+        img_valid_path, gt_valid_path, camvid_colors, load_greylevel_mask=True,
+        save=False)  # load_greylevel_mask=True by default because it's grey
+
     print "Processing Camvid SegNet test dataset..."
     img_test, mask_test, filenames_test = load_images(
         img_test_path, gt_test_path, camvid_colors, load_greylevel_mask=True,
         save=False)  # load_greylevel_mask=True by default because it's grey
 
-    return img_train, mask_train, filenames_train, \
-           img_test, mask_test, filenames_test
+    return (img_train, mask_train, filenames_train,
+            img_test, mask_test, filenames_test,
+            img_valid, mask_valid, filenames_valid)
 
 
 def load_data(
         path=os.path.expanduser('~/exp/datasets/camvid/'),
         randomize=False,
         resize_images=True,
-        resize_size=[320, 240],  # w x h : 960x720, 480x360, 320x240
+        resize_size=[480, 360],  # w x h : 960x720, 480x360, 320x240
         color=False,
         color_space='RGB',
         normalize=False,
         classes='subset_11',  # subset_11 , all
-        version='standard',  # standard, segnet
+        version='segnet',  # standard, segnet
         split=[.44, .22],
         with_filenames=False,
         load_greylevel_mask=False,
@@ -296,35 +307,35 @@ def load_data(
 
     if version == 'segnet':
         path = os.path.join(path, 'segnet')
-        img_train, \
-            mask_train, \
-            filenames_train, \
-            img_test, \
-            mask_test, \
-            filenames_test = load_dataset_camvid_segnet(path)
-        img_val = []
-        mask_val = []
-        filenames_val = []
+        (img_train,
+         mask_train,
+         filenames_train,
+         img_test,
+         mask_test,
+         filenames_test,
+         img_val,
+         mask_val,
+         filenames_val) = load_dataset_camvid_segnet(path)
 
     elif version == 'standard':
         path = os.path.join(path, 'splitted_960x720')
-        img_train, \
-            mask_train, \
-            filenames_train, \
-            img_test, \
-            mask_test, \
-            filenames_test, \
-            img_val, \
-            mask_val, \
-            filenames_val = load_dataset_camvid(path,
-                                                resize_images=resize_images,
-                                                resize_size=resize_size,
-                                                load_greylevel_mask=
-                                                load_greylevel_mask,
-                                                classes=classes,
-                                                save=save,
-                                                color_space=color_space
-                                                )
+        (img_train,
+         mask_train,
+         filenames_train,
+         img_test,
+         mask_test,
+         filenames_test,
+         img_val,
+         mask_val,
+         filenames_val) = load_dataset_camvid(path,
+                                              resize_images=resize_images,
+                                              resize_size=resize_size,
+                                              load_greylevel_mask=
+                                              load_greylevel_mask,
+                                              classes=classes,
+                                              save=save,
+                                              color_space=color_space
+                                              )
 
     if compute_stats == 'all':
         images = np.asarray(img_train + img_val + img_test)
