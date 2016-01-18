@@ -230,11 +230,11 @@ def load_dataset_camvid(path, load_greylevel_mask=False, classes='subset_11',
 
 def load_dataset_camvid_segnet(path):
     img_train_path = os.path.join(path, 'train')
-    img_valid_path = os.path.join(path, 'valid')
+    img_valid_path = os.path.join(path, 'val')
     img_test_path = os.path.join(path, 'test')
 
     gt_train_path = os.path.join(path, 'trainannot')
-    gt_valid_path = os.path.join(path, 'validannot')
+    gt_valid_path = os.path.join(path, 'valannot')
     gt_test_path = os.path.join(path, 'testannot')
 
     camvid_colors = OrderedDict([
