@@ -24,6 +24,7 @@ from utils import iterate_minibatches, validate
 # TODO these should go into preprocess/helper dataset
 import camvid
 import daimler
+import fashionista
 import kitti_road
 
 floatX = theano.config.floatX
@@ -56,6 +57,7 @@ floatX = theano.config.floatX
 # saveto = "recseg_lasagne_camvid.npz"
 datasets = {'camvid': (camvid.load_data, camvid.properties),
             'daimler': (daimler.load_data, daimler.properties),
+            'fashionista': (fashionista.load_data, fashionista.properties),
             'kitti_road': (kitti_road.load_data, kitti_road.properties)}
 
 
