@@ -11,7 +11,9 @@ from theano.sandbox.cuda.basic_ops import gpu_contiguous, gpu_alloc_empty
 def buildReSeg(input_shape, n_layers, pheight, pwidth, dim_proj, nclasses,
                stack_sublayers, out_upsampling, out_nfilters, out_filters_size,
                out_filters_stride):
+    '''Helper function to build a ReSeg network
 
+    '''
     input_var = T.tensor4('inputs')
     target_var = T.ivector('targets')
     weights_loss = T.scalar('weights_loss')
@@ -80,7 +82,40 @@ def buildReSeg(input_shape, n_layers, pheight, pwidth, dim_proj, nclasses,
 class ReSegLayer(lasagne.layers.Layer):
     def __init__(self, l_in, n_layers, pheight, pwidth, dim_proj, nclasses,
                  stack_sublayers, out_upsampling, out_nfilters,
-                 out_filters_size, out_filters_stride, name):
+                 out_filters_size, out_filters_stride, name=''):
+        """A ReSeg layer
+
+        The ReSeg layer is composed by multiple ReNet layers and an
+        upsampling layer
+
+        Parameters
+        ----------
+        l_in : lasagne.layers.Layer
+            The input layer
+        n_layers : int
+            The number of layers
+        pheight : tuple
+            The height of the patches, for each layer
+        pwidth : tuple
+            The width of the patches, for each layer
+        dim_proj : tuple
+            The number of hidden units of each RNN, for each layer
+        nclasses : int
+            The number of classes of the data
+        stack_sublayers : bool
+            If True the bidirectional RNNs in the ReNet layers will be
+            stacked one over the other. See ReNet for more details.
+        out_upsampling : string
+            The kind of upsampling to be used
+        out_nfilters : int
+            The number of hidden units of the upsampling layer
+        out_filters_size : tuple
+            The size of the upsampling filters, if any
+        out_filters_stride : tuple
+            The stride of the upsampling filters, if any
+        name : string
+            The name of the layer, optional
+        """
 
         super(ReSegLayer, self).__init__(l_in, name)
         self.l_in = l_in
@@ -166,27 +201,38 @@ class ReSegLayer(lasagne.layers.Layer):
         return input_var
 
 
-# def buildReNetLayer(input,
 class ReNetLayer(lasagne.layers.Layer):
 
     def __init__(self, l_in, patch_size=(2, 2), n_hidden=50,
                  stack_sublayers=False, name='', **kwargs):
-        """Each ReNet layer contains 4 rnns:
-        * First SubLayer:
-            2 rnns scan the image vertically (up and down)
-        * Second Sublayer:
-            2 rnns scan the image horizontally (left and right)
+        """A ReNet layer
 
-        The sublayers can be stack_sublayers or can scan in parallel the image
+        Each ReNet layer is composed by 4 RNNs (or 2 bidirectional RNNs):
+        * First SubLayer:
+            2 RNNs scan the image vertically (up and down)
+        * Second Sublayer:
+            2 RNNs scan the image horizontally (left and right)
+
+        The sublayers can be stacked one over the other or can scan the
+        image in parallel
 
         Parameters
         ----------
-        input_var :
-            The
-        shape :
-            The
-        patch_size :
-            The
+        l_in : lasagne.layers.Layer
+            The input layer
+        patch_size : tuple
+            The size of the patch expressed as (pheight, pwidth).
+            Optional
+        n_hidden : int
+            The number of hidden units of each RNN. Optional
+        stack_sublayers : bool
+            If True, the sublayers (i.e. the bidirectional RNNs) will be
+            stacked one over the other, meaning that the second
+            bidirectional RNN will read the feature map coming from the
+            first bidirectional RNN. If False, all the RNNs will read
+            the input. Optional
+        name : string
+            The name of the layer, optional
         """
         super(ReNetLayer, self).__init__(l_in, name)
         self.l_in = l_in
@@ -232,7 +278,7 @@ class ReNetLayer(lasagne.layers.Layer):
             name=self.name + "_sub0_dimshuffle")
 
         # Left/right scan
-        l_sub0 = swipeAndConcat(
+        l_sub0 = BidirectionalRNNLayer(
             l_sub0,
             n_hidden,
             name=self.name + "_sub0_renetsub")
@@ -279,8 +325,7 @@ class ReNetLayer(lasagne.layers.Layer):
             name=self.name + "_sub1_dimshuffle1")
 
         # Down/up scan
-        # TODO Make it a BidirectionalRNNLayer
-        l_sub1 = swipeAndConcat(
+        l_sub1 = BidirectionalRNNLayer(
             l_sub1,
             n_hidden,
             name=self.name + "_sub1_renetsub")
@@ -340,63 +385,100 @@ class ReNetLayer(lasagne.layers.Layer):
         return input_var
 
 
-def swipeAndConcat(incoming,
-                   num_units,
-                   # resetgate=lasagne.layers.Gate(
-                   #     W_in=lasagne.init.Orthogonal(1.0),
-                   #     W_hid=lasagne.init.Orthogonal(1.0),
-                   #     W_cell=lasagne.init.Orthogonal(1.0),
-                   #     b=lasagne.init.Constant(0.),
-                   #     nonlinearity=lasagne.nonlinearities.tanh),
-                   # updategate=lasagne.layers.Gate(
-                   #     W_in=lasagne.init.Orthogonal(1.0),
-                   #     W_hid=lasagne.init.Orthogonal(1.0),
-                   #     W_cell=lasagne.init.Orthogonal(1.0),
-                   #     b=lasagne.init.Constant(0.),
-                   #     nonlinearity=lasagne.nonlinearities.tanh),
-                   # hidden_update=lasagne.layers.Gate(
-                   #     W_in=lasagne.init.Orthogonal(1.0),
-                   #     W_hid=lasagne.init.Orthogonal(1.0),
-                   #     W_cell=lasagne.init.Orthogonal(1.0),
-                   #     b=lasagne.init.Constant(0.),
-                   #     nonlinearity=lasagne.nonlinearities.tanh),
-                   # hid_init=lasagne.init.Constant(0.),
-                   grad_clipping=10,
-                   name=''):
+class BidirectionalRNNLayer(lasagne.layers.Layer):
 
-    # We're using a bidirectional network, which means we will combine two
-    # RecurrentLayers, one with the backwards=True keyword argument.
     # Setting a value for grad_clipping will clip the gradients in the layer
-    # Setting only_return_final=True makes the layers only return their
-    # output for the final time step, which is all we need for this task
-    l_forward = lasagne.layers.GRULayer(
-        incoming,
-        num_units,
-        # resetgate=resetgate,
-        # updategate=updategate,
-        # hidden_update=hidden_update,
-        # hid_init=hid_init,
-        # grad_clipping=grad_clipping,
-        only_return_final=False,
-        name=name + '_l_forward_sub')
-    l_backward = lasagne.layers.GRULayer(
-        l_forward,
-        num_units,
-        # resetgate=resetgate,
-        # updategate=updategate,
-        # hidden_update=hidden_update,
-        # hid_init=hid_init,
-        # grad_clipping=grad_clipping,
-        only_return_final=False,
-        backwards=True,
-        name=name + '_l_backward_sub')
+    def __init__(self, l_in, num_units,
+                 # resetgate=lasagne.layers.Gate(
+                 #     W_in=lasagne.init.Orthogonal(1.0),
+                 #     W_hid=lasagne.init.Orthogonal(1.0),
+                 #     W_cell=lasagne.init.Orthogonal(1.0),
+                 #     b=lasagne.init.Constant(0.),
+                 #     nonlinearity=lasagne.nonlinearities.tanh),
+                 # updategate=lasagne.layers.Gate(
+                 #     W_in=lasagne.init.Orthogonal(1.0),
+                 #     W_hid=lasagne.init.Orthogonal(1.0),
+                 #     W_cell=lasagne.init.Orthogonal(1.0),
+                 #     b=lasagne.init.Constant(0.),
+                 #     nonlinearity=lasagne.nonlinearities.tanh),
+                 # hidden_update=lasagne.layers.Gate(
+                 #     W_in=lasagne.init.Orthogonal(1.0),
+                 #     W_hid=lasagne.init.Orthogonal(1.0),
+                 #     W_cell=lasagne.init.Orthogonal(1.0),
+                 #     b=lasagne.init.Constant(0.),
+                 #     nonlinearity=lasagne.nonlinearities.tanh),
+                 # hid_init=lasagne.init.Constant(0.),
+                 grad_clipping=0, name='', **kwargs):
+        """BidirectionalRNNLayer
 
-    # Now we'll concatenate the outputs to combine them
-    # Note that l_backward is already inverted by Lasagne
-    l_concat = lasagne.layers.ConcatLayer([l_forward, l_backward],
-                                          axis=2, name=name+'_concat')
+        A bidirectional RNN.
 
-    return l_concat
+        Parameters
+        ----------
+        l_in : lasagne.layers.Layer
+            The input layer
+        num_units : int
+            The number of hidden units of each RNN
+        grad_clipping : int
+            The amount of gradient clipping, optional
+        name = string
+            The name of the layer, optional
+        """
+        super(BidirectionalRNNLayer, self).__init__(l_in, name, **kwargs)
+        self.l_in = l_in
+        self.num_units = num_units
+        self.grad_clipping = grad_clipping
+        self.name = name
+
+        # We use a bidirectional RNN, which means we combine two
+        # RecurrentLayers, the second of which with backwards=True
+        # Setting only_return_final=True makes the layers only return their
+        # output for the final time step, which is all we need for this task
+        l_forward = lasagne.layers.GRULayer(
+            l_in,
+            num_units,
+            # resetgate=resetgate,
+            # updategate=updategate,
+            # hidden_update=hidden_update,
+            # hid_init=hid_init,
+            grad_clipping=grad_clipping,
+            only_return_final=False,
+            name=name + '_l_forward_sub')
+        l_backward = lasagne.layers.GRULayer(
+            l_forward,
+            num_units,
+            # resetgate=resetgate,
+            # updategate=updategate,
+            # hidden_update=hidden_update,
+            # hid_init=hid_init,
+            grad_clipping=grad_clipping,
+            only_return_final=False,
+            backwards=True,
+            name=name + '_l_backward_sub')
+
+        # Now we'll concatenate the outputs to combine them
+        # Note that l_backward is already inverted by Lasagne
+        l_concat = lasagne.layers.ConcatLayer([l_forward, l_backward],
+                                              axis=2, name=name+'_concat')
+
+        # HACK LASAGNE
+        # This will set `self.input_layer`, which is needed by Lasagne to find
+        # the layers with the get_all_layers() helper function in the
+        # case of a layer with sublayers
+        if isinstance(l_concat, tuple):
+            self.input_layer = None
+        else:
+            self.input_layer = l_concat
+
+    def get_output_shape_for(self, input_shape):
+        return list(input_shape[0:2]) + [self.num_units * 2]
+
+    def get_output_for(self, input_var, **kwargs):
+        # HACK LASAGNE
+        # This is needed, jointly with the previous hack, to ensure that
+        # this layer behaves as its last sublayer (namely,
+        # self.input_layer)
+        return input_var
 
 
 class LinearUpsamplingLayer(lasagne.layers.Layer):
