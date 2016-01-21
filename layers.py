@@ -2,364 +2,489 @@ import numpy as np
 import theano
 import theano.tensor as T
 import lasagne
+from lasagne.layers import get_output_shape
 from theano.sandbox.cuda.dnn import dnn_conv
 from theano.sandbox.cuda.dnn import GpuDnnConvDesc, GpuDnnConvGradI
 from theano.sandbox.cuda.basic_ops import gpu_contiguous, gpu_alloc_empty
 
 
-def buildReSeg(
-        input_shape,
-        n_layers,
-        pheight,
-        pwidth,
-        dim_proj,
-        nclasses,
-        stack_sublayers,
-        out_upsampling,
-        out_nfilters,
-        out_filters_size,
-        out_filters_stride):
+def buildReSeg(input_shape, n_layers, pheight, pwidth, dim_proj, nclasses,
+               stack_sublayers, out_upsampling, out_nfilters, out_filters_size,
+               out_filters_stride):
+    '''Helper function to build a ReSeg network
 
-    # First, we build the network, starting with an input layer
-    # Recurrent layers expect input of shape
-    # (batch size, max sequence length, number of features)
+    '''
     input_var = T.tensor4('inputs')
     target_var = T.ivector('targets')
     weights_loss = T.scalar('weights_loss')
 
-    # INPUT LAYER it has the input dimension:
-    # canvas dimension:
-    # batch_size, heigth, width, channels
-    batch_size, cheight, cwidth, cchannels = input_shape
+    # Tag test values
+    input_var.tag.test_value = np.random.random(
+        input_shape).astype('float32')
+    target_var.tag.test_value = np.random.random(
+        list(input_shape[:3]) + [nclasses]).astype('float32')
+    # theano.config.compute_test_value = 'warn'
+
+    # The ReSeg layer
+    print('Input shape: ' + str(input_shape))
     l_in = lasagne.layers.InputLayer(shape=input_shape,
                                      input_var=input_var,
-                                     name="input_layer"
-                                     )
+                                     name="input_layer")
 
-    # TODO insert input conv layers
-    # Here I introduce some inputs valid convolutional layers
-    # An idea could be to use VGG16 structure (maybe also the pretrained
-    # weights) and then ReNet with 1x1 patch.
-    # The I can use InverseLayer to invert the input conv layers
-    # for now I add only some input convolution in order to extract some
-    # features
-    # and use less memory for the rnns
-
-    for idx_layers in xrange(n_layers):
-        # number of blocks in each direction
-        nblocksH = cheight / pheight[idx_layers]
-        nblocksW = cwidth / pwidth[idx_layers]
-        # I PREPARE THE CANVAS INPUT TO GO IN THE NEXT RENET LAYER
-        # I divide the image in blocks of the dimension of the patch_size
-        # So I reorder in such a way that each block is flattened over the
-        # channel dimension
-        # so we have:
-        # batch_size, n_block_height, n_block_width, n_el_each_block*channels
-        l_in = lasagne.layers.ReshapeLayer(
-                l_in,
-                (batch_size,
-                 nblocksH,
-                 pheight[idx_layers],
-                 nblocksW,
-                 pwidth[idx_layers],
-                 cchannels),
-                name="reshape_0_"+str(idx_layers))
-        l_in = lasagne.layers.DimshuffleLayer(
-                l_in, (0, 1, 3, 2, 4, 5),
-                name="dimshuffle_0_"+str(idx_layers))
-        l_in = lasagne.layers.ReshapeLayer(
-                l_in, (batch_size,
-                       nblocksH,
-                       nblocksW,
-                       pheight[idx_layers] * pwidth[idx_layers] * cchannels),
-                name="reshape_1_"+str(idx_layers))
-
-        # RENET LAYER
-        renet_layer_out, out_shape_layer = buildReNetLayer(
-                l_in,
-                (batch_size, nblocksH, nblocksW, cchannels),
-                patch=(pwidth[idx_layers], pheight[idx_layers]),
-                n_hidden=dim_proj[idx_layers],
-                stack_sublayers=stack_sublayers[idx_layers],
-                n_layer=idx_layers)
-
-        # TODO: insert dimensional reduction 1x1 Conv layer after ReNet layer
-
-        _, cheight,  cwidth, cchannels = out_shape_layer
-        l_in = renet_layer_out
-
-        n_rnns = 2 if stack_sublayers[idx_layers] else 4
-        print('ReNet: After {} rnns {}x{} @ {}: {}'.format(
-                n_rnns,
-                pheight[idx_layers],
-                pwidth[idx_layers],
-                dim_proj[idx_layers],
-                out_shape_layer))
-
-    # UPSAMPLING
-    if out_upsampling == 'grad':
-        # We use a custom Deconv layer: UpsampleConv2DDNNLayer
-        # the input have have to be in the 'bc01' shape
-        renet_layer_out = lasagne.layers.dimshuffle(renet_layer_out,
-                                                    (0, 3, 1, 2))
-
-        for i, (num_filters, filter_size, filter_stride) in enumerate(zip(
-                out_nfilters, out_filters_size, out_filters_stride)):
-            renet_layer_out = UpsampleConv2DDNNLayer(
-                    renet_layer_out,
-                    num_filters=num_filters,
-                    filter_size=filter_size,
-                    stride=filter_stride,
-                    pad='same')
-
-        out_layer = lasagne.layers.DimshuffleLayer(renet_layer_out,
-                                                   (0, 2, 3, 1))
-
-    elif out_upsampling == 'linear':
-        expand_height = np.prod(pheight)
-        expand_width = np.prod(pwidth)
-        out_layer = LinearUpsamplingLayer(renet_layer_out,
-                                          expand_height,
-                                          expand_width,
-                                          nclasses,
-                                          name="linear_upsample_layer")
+    l_reseg = ReSegLayer(l_in, n_layers, pheight, pwidth, dim_proj,
+                         nclasses, stack_sublayers, out_upsampling,
+                         out_nfilters, out_filters_size,
+                         out_filters_stride, 'reseg')
 
     # Reshape in 2D, last dimension is nclasses, where the softmax is applied
-    out_layer = lasagne.layers.ReshapeLayer(out_layer,
-                                            [-1, out_nfilters[-1]],
-                                            name='reshape_before_softmax')
-    out_layer = lasagne.layers.NonlinearityLayer(
-            out_layer,
+    l_out = lasagne.layers.ReshapeLayer(
+        l_reseg,
+        (T.prod(l_reseg.output_shape[0:3]), [3]),
+        name='reshape_before_softmax')
+
+    l_pred = lasagne.layers.NonlinearityLayer(
+            l_out,
             nonlinearity=lasagne.nonlinearities.softmax,
             name="softmax_layer")
 
     # Create a loss expression for training, i.e., a scalar objective we want
     # to minimize (for our multi-class problem, it is the cross-entropy loss):
-
-    prediction = lasagne.layers.get_output(out_layer)
+    prediction = lasagne.layers.get_output(l_pred)
 
     loss = lasagne.objectives.categorical_crossentropy(
-            prediction, target_var)
+        prediction, target_var)
     loss = weights_loss * loss.mean()
 
     # TODO We could add some weight decay as well here,
     # see lasagne.regularization.
 
-    # Create update expressions for training, i.e., how to modify the
-    # parameters at each training step. Here, we'll use Stochastic Gradient
-    # Descent (SGD) with Nesterov momentum, but Lasagne offers plenty more.
-    params = lasagne.layers.get_all_params(out_layer, trainable=True)
+    params = lasagne.layers.get_all_params(l_pred, trainable=True)
+    # Stochastic Gradient Descent (SGD) with Nesterov momentum
     # updates = lasagne.updates.nesterov_momentum(
     #         loss, params, learning_rate=LEARNING_RATE, momentum=0.9)
     updates = lasagne.updates.adadelta(loss, params)
 
-    test_prediction = lasagne.layers.get_output(out_layer, deterministic=True)
-    # this is the function that gives back the mask prediction
-    f_pred = theano.function([input_var],
-                             T.argmax(test_prediction, axis=1).reshape(
-                                     input_shape[:3]))
+    # Compile the function that gives back the mask prediction
+    prediction = lasagne.layers.get_output(l_pred, deterministic=True)
+    f_pred = theano.function(
+        [input_var],
+        T.argmax(prediction, axis=1).reshape(input_shape[:3]))
 
-    # Compile a function performing a training step on a mini-batch (by giving
-    # the updates dictionary) and returning the corresponding training loss:
+    # Compile the function that performs a training step on a mini-batch
+    # (by using the updates dictionary) and returns the corresponding training
+    # loss:
     f_train = theano.function([input_var, target_var, weights_loss], loss,
                               updates=updates)
 
-    return out_layer, f_pred, f_train
+    return l_out, f_pred, f_train
 
 
-def buildReNetLayer(input,
-                    shape,
-                    patch=(2, 2),
-                    n_hidden=50,
-                    stack_sublayers=False,
-                    **kwargs):
-    """
-    Each ReNet layer contains 4 rnns:
-            First SubLayer:
-                2 rnns scans the image vertically (up and down)
-            Second Sublayer:
-                2 rnns scans the ima
+class ReSegLayer(lasagne.layers.Layer):
+    def __init__(self, l_in, n_layers, pheight, pwidth, dim_proj, nclasses,
+                 stack_sublayers, out_upsampling, out_nfilters,
+                 out_filters_size, out_filters_stride, name=''):
+        """A ReSeg layer
 
-        The sublayers can be stack_sublayers or can scan in parallel the image
+        The ReSeg layer is composed by multiple ReNet layers and an
+        upsampling layer
 
-    :param input:
-    :param shape:
-    :param patch:
-    :param n_hidden:
-    :param stack_sublayers:
-    :param kwargs:
-    :return:
-    """
+        Parameters
+        ----------
+        l_in : lasagne.layers.Layer
+            The input layer
+        n_layers : int
+            The number of layers
+        pheight : tuple
+            The height of the patches, for each layer
+        pwidth : tuple
+            The width of the patches, for each layer
+        dim_proj : tuple
+            The number of hidden units of each RNN, for each layer
+        nclasses : int
+            The number of classes of the data
+        stack_sublayers : bool
+            If True the bidirectional RNNs in the ReNet layers will be
+            stacked one over the other. See ReNet for more details.
+        out_upsampling : string
+            The kind of upsampling to be used
+        out_nfilters : int
+            The number of hidden units of the upsampling layer
+        out_filters_size : tuple
+            The size of the upsampling filters, if any
+        out_filters_stride : tuple
+            The stride of the upsampling filters, if any
+        name : string
+            The name of the layer, optional
+        """
 
-    n_layer = kwargs.get("n_layer", 0)
+        super(ReSegLayer, self).__init__(l_in, name)
+        self.l_in = l_in
+        self.n_layers = n_layers
+        self.pheight = pheight
+        self.pwidth = pwidth
+        self.dim_proj = dim_proj
+        self.nclasses = nclasses
+        self.stack_sublayers = stack_sublayers
+        self.out_upsampling = out_upsampling
+        self.out_nfilters = out_nfilters
+        self.out_filters_size = out_filters_size
+        self.out_filters_stride = out_filters_stride
+        self.name = name
 
-    # canvas dimension
-    batch_size, nblocksH, nblocksW, cchannels = shape
-    # patch dimension
-    pheight, pwidth = patch
+        (batch_size, cheight, cwidth, cchannels) = get_output_shape(l_in)
 
-    # actually the real dimensions now are:
-    # batch_size, nblocksH, nblocksW, pheight * pwidth * cchannels
-    # it means if the original image was:
-    # batch_size, 240, 320, 3
-    # and patch_size = (2, 2)
-    # then the dimensions are
-    # batch_size, 120, 160, 3*2*2=12
+        # TODO insert input conv layers
 
-    # FIRST SUBLAYER
-    # The GRU Layer needs a 3D tensor input
-    shape = (batch_size * nblocksH, nblocksW, pheight * pwidth * cchannels)
-    reshape_input_sublayer1 = lasagne.layers.ReshapeLayer(
-            input,
-            shape,
-            name="renet_reshape_in_"+str(n_layer))
+        # ReNet layers
+        l_renet = l_in
+        for lidx in xrange(n_layers):
+            l_renet = ReNetLayer(l_renet, patch=(pwidth[lidx], pheight[lidx]),
+                                 n_hidden=dim_proj[lidx],
+                                 stack_sublayers=stack_sublayers[lidx],
+                                 name=self.name + '_renet' + str(lidx))
+            out_shape = get_output_shape(l_renet)
 
-    # I want to iterate over each block so I swap
-    reshape_input_sublayer1 = lasagne.layers.DimshuffleLayer(
-            reshape_input_sublayer1,
-            (1, 0, 2))
+            # TODO: insert dimensional reduction 1x1 Conv layer after ReNet
 
-    # left/right scan
-    sub_layer1_out = buildReNetSublayer(
-            reshape_input_sublayer1, n_hidden,
-            suffix=str(n_layer) + "_" + str(0))
+            n_rnns = 2 if stack_sublayers[lidx] else 4
+            print('ReNet: After {} rnns {}x{} @ {}: {}'.format(
+                n_rnns, pheight[lidx], pwidth[lidx], dim_proj[lidx],
+                out_shape))
 
-    # after the bidirectional rnns now I have the following 3D shape:
-    # nblocksW, batch_size * nblocksH, 2*n_hidden
-    # so I revert the swap and restore the 4D tensor
-    shape_after_sublayer1 = (batch_size, nblocksH, nblocksW, 2*n_hidden)
+        # UPSAMPLING
+        # TODO We could use InverseLayer to invert the input conv layers (?)
+        if out_upsampling == 'grad':
+            # We use a custom Deconv layer: UpsampleConv2DDNNLayer
+            # the input has to be in the 'bc01' shape
+            l_renet_out = lasagne.layers.dimshuffle(l_renet,
+                                                    (0, 3, 1, 2))
 
-    sub_layer1_out = lasagne.layers.DimshuffleLayer(
-            sub_layer1_out,
-            (1, 0, 2))
-    reshape_after_sublayer1 = lasagne.layers.ReshapeLayer(
-        sub_layer1_out,
-        shape_after_sublayer1,
-        name="renet_reshape_0_after_"+str(n_layer))
+            for i, (num_filters, filter_size, filter_stride) in enumerate(zip(
+                    out_nfilters, out_filters_size, out_filters_stride)):
+                renet_layer_out = UpsampleConv2DDNNLayer(
+                        l_renet_out,
+                        num_filters=num_filters,
+                        filter_size=filter_size,
+                        stride=filter_stride,
+                        pad='same')
 
-    # The second sublayer can be stacked or not
-    # If is stack_sublayers it takes in input the first sublayer output,
-    # otherwise the input is the same of the first sublayer (e.g the image)
-    if stack_sublayers:
-        input_sublayer2 = reshape_after_sublayer1
-        cchannels = 2 * n_hidden
-    else:
-        input_sublayer2 = input
-        cchannels = cchannels * pwidth * pheight
+            l_out = lasagne.layers.DimshuffleLayer(renet_layer_out,
+                                                   (0, 2, 3, 1))
 
-    # SECOND SUBLAYER
-    # vertical/horizontal scan
+        elif out_upsampling == 'linear':
+            expand_height = np.prod(pheight)
+            expand_width = np.prod(pwidth)
+            l_out = LinearUpsamplingLayer(l_renet,
+                                          expand_height,
+                                          expand_width,
+                                          nclasses,
+                                          name="linear_upsample_layer")
+        self.l_out = l_out
 
-    reshape_input_sublayer2 = lasagne.layers.DimshuffleLayer(
-            input_sublayer2,
+        # HACK LASAGNE
+        # This will set `self.input_layer`, which is needed by Lasagne to find
+        # the layers with the get_all_layers() helper function in the
+        # case of a layer with sublayers
+        if isinstance(self.l_out, tuple):
+            self.input_layer = None
+        else:
+            self.input_layer = self.l_out
+
+    def get_output_shape_for(self, input_shape):
+        return list(input_shape[0:3]) + [self.nclasses]
+
+    def get_output_for(self, input_var, **kwargs):
+        # HACK LASAGNE
+        # This is needed, jointly with the previous hack, to ensure that
+        # this layer behaves as its last sublayer (namely,
+        # self.input_layer)
+        return input_var
+
+
+class ReNetLayer(lasagne.layers.Layer):
+
+    def __init__(self, l_in, patch_size=(2, 2), n_hidden=50,
+                 stack_sublayers=False, name='', **kwargs):
+        """A ReNet layer
+
+        Each ReNet layer is composed by 4 RNNs (or 2 bidirectional RNNs):
+        * First SubLayer:
+            2 RNNs scan the image vertically (up and down)
+        * Second Sublayer:
+            2 RNNs scan the image horizontally (left and right)
+
+        The sublayers can be stacked one over the other or can scan the
+        image in parallel
+
+        Parameters
+        ----------
+        l_in : lasagne.layers.Layer
+            The input layer
+        patch_size : tuple
+            The size of the patch expressed as (pheight, pwidth).
+            Optional
+        n_hidden : int
+            The number of hidden units of each RNN. Optional
+        stack_sublayers : bool
+            If True, the sublayers (i.e. the bidirectional RNNs) will be
+            stacked one over the other, meaning that the second
+            bidirectional RNN will read the feature map coming from the
+            first bidirectional RNN. If False, all the RNNs will read
+            the input. Optional
+        name : string
+            The name of the layer, optional
+        """
+        super(ReNetLayer, self).__init__(l_in, name)
+        self.l_in = l_in
+        self.patch_size = patch_size
+        self.n_hidden = n_hidden
+        self.stack_sublayers = stack_sublayers
+        self.name = name
+
+        batch_size, cheight, cwidth, cchannels = get_output_shape(l_in)
+        pheight, pwidth = patch_size
+
+        # Number of patches in each direction
+        npatchesH = cheight / pheight
+        npatchesW = cwidth / pwidth
+
+        # Split in patches
+        l_sub0 = lasagne.layers.ReshapeLayer(
+            l_in,
+            (batch_size, npatchesH, pheight, npatchesW, pwidth, cchannels),
+            name=self.name + "_reshape0")
+
+        l_sub0 = lasagne.layers.DimshuffleLayer(
+            l_sub0,
+            (0, 1, 3, 2, 4, 5),
+            name=self.name + "_dimshuffle0")
+
+        l_sub0 = lasagne.layers.ReshapeLayer(
+            l_sub0,
+            (batch_size, npatchesH, npatchesW, pheight * pwidth * cchannels),
+            name=self.name + "_reshape1")
+
+        # FIRST SUBLAYER
+        # The GRU Layer needs a 3D tensor input
+        l_sub0 = lasagne.layers.ReshapeLayer(
+            l_sub0,
+            (batch_size * npatchesH, npatchesW, pheight * pwidth * cchannels),
+            name=self.name + "_sub0_reshape")
+
+        # Iterate over columns
+        l_sub0 = lasagne.layers.DimshuffleLayer(
+            l_sub0,
+            (1, 0, 2),
+            name=self.name + "_sub0_dimshuffle")
+
+        # Left/right scan
+        l_sub0 = BidirectionalRNNLayer(
+            l_sub0,
+            n_hidden,
+            name=self.name + "_sub0_renetsub")
+
+        # Revert dimshuffle
+        l_sub0 = lasagne.layers.DimshuffleLayer(
+            l_sub0,
+            (1, 0, 2),
+            name=self.name + "_sub0_undimshuffle")
+
+        # Revert reshape
+        l_sub0 = lasagne.layers.ReshapeLayer(
+            l_sub0,
+            (batch_size, npatchesH, npatchesW, 2 * n_hidden),
+            name=self.name + "_sub0_unreshape")
+
+        # If stack_sublayers is True, the second sublayer takes as an input the
+        # first sublayer's output, otherwise the input of the ReNetLayer (e.g
+        # the image)
+        if stack_sublayers:
+            input_sublayer1 = l_sub0
+            cchannels = 2 * n_hidden
+        else:
+            input_sublayer1 = l_in
+            # cchannels = cchannels * pwidth * pheight
+
+        # SECOND SUBLAYER
+        # Invert rows and columns
+        l_sub1 = lasagne.layers.DimshuffleLayer(
+            input_sublayer1,
             (0, 2, 1, 3),
-            name="renet_reshape_1_after_"+str(n_layer))
+            name=self.name + "_sub1_dimshuffle0")
 
-    reshape_input_sublayer2 = lasagne.layers.ReshapeLayer(
-            reshape_input_sublayer2,
-            (batch_size * nblocksW, nblocksH, cchannels),
-            name="renet_reshape_2_after_"+str(n_layer))
-    # I want to iterate over each block so I swap
-    reshape_input_sublayer2 = lasagne.layers.DimshuffleLayer(
-            reshape_input_sublayer2,
-            (1, 0, 2))
+        # The GRU Layer needs a 3D tensor input
+        l_sub1 = lasagne.layers.ReshapeLayer(
+            l_sub1,
+            (batch_size * npatchesW, npatchesH, cchannels),
+            name=self.name + "_sub1_reshape")
 
-    # down/up
-    sub_layer2_out = buildReNetSublayer(reshape_input_sublayer2,
-                                        n_hidden,
-                                        suffix=str(n_layer) + "_" + str(1))
+        # Iterate over rows
+        l_sub1 = lasagne.layers.DimshuffleLayer(
+            l_sub1,
+            (1, 0, 2),
+            name=self.name + "_sub1_dimshuffle1")
 
-    # after the bidirectional rnns now I have the following 3D shape:
-    # nblocksH, batch_size * nblocksW, 2*n_hidden
-    # so I revert the swap and restore the 4D tensor
-    shape_after_sublayer2 = (batch_size, nblocksW, nblocksH, 2 * n_hidden)
-    reshape_after_sublayer2 = lasagne.layers.DimshuffleLayer(
-            sub_layer2_out,
-            (1, 0, 2))
+        # Down/up scan
+        l_sub1 = BidirectionalRNNLayer(
+            l_sub1,
+            n_hidden,
+            name=self.name + "_sub1_renetsub")
 
-    reshape_after_sublayer2 = lasagne.layers.ReshapeLayer(
-            reshape_after_sublayer2,
-            shape_after_sublayer2,
-            name="renet_reshape_3_after_"+str(n_layer))
+        # Revert the last dimshuffle
+        l_sub1 = lasagne.layers.DimshuffleLayer(
+            l_sub1,
+            (1, 0, 2),
+            name=self.name + "_sub1_undimshuffle1")
 
-    reshape_after_sublayer2 = lasagne.layers.DimshuffleLayer(
-            reshape_after_sublayer2,
+        # Revert the reshape
+        l_sub1 = lasagne.layers.ReshapeLayer(
+            l_sub1,
+            (batch_size, npatchesW, npatchesH, 2 * n_hidden),
+            name=self.name + "_sub1_unreshape")
+
+        # Revert the other dimshuffle
+        l_sub1 = lasagne.layers.DimshuffleLayer(
+            l_sub1,
             (0, 2, 1, 3),
-            name="renet_reshape_4_after_"+str(n_layer))
+            name=self.name + "_sub1_undimshuffle0")
 
-    if not stack_sublayers:
-        output = lasagne.layers.ConcatLayer(
-                [reshape_after_sublayer1, reshape_after_sublayer2],
+        # Set out_layer and out_shape
+        if not stack_sublayers:
+            self.out_layer = lasagne.layers.ConcatLayer(
+                [l_sub0, l_sub1],
                 axis=3)
-        output_shape = (batch_size, nblocksH, nblocksW, 4 * n_hidden)
-    else:
-        output = reshape_after_sublayer2
-        output_shape = (batch_size, nblocksH, nblocksW, 2 * n_hidden)
+        else:
+            self.out_layer = l_sub1
 
-    return output, output_shape
+        # HACK LASAGNE
+        # This will set `self.input_layer`, which is needed by Lasagne to find
+        # the layers with the get_all_layers() helper function in the
+        # case of a layer with sublayers
+        if isinstance(self.out_layer, tuple):
+            self.input_layer = None
+        else:
+            self.input_layer = self.out_layer
+
+    def get_output_shape_for(self, input_shape):
+        pheight, pwidth = self.patch_size
+        npatchesH = input_shape[1] / pheight
+        npatchesW = input_shape[2] / pwidth
+
+        if self.stack_sublayers:
+            dim = 2 * self.n_hidden
+        else:
+            dim = 4 * self.n_hidden
+
+        return input_shape[0], npatchesH, npatchesW, dim
+
+    def get_output_for(self, input_var, **kwargs):
+        # HACK LASAGNE
+        # This is needed, jointly with the previous hack, to ensure that
+        # this layer behaves as its last sublayer (namely,
+        # self.input_layer)
+        return input_var
 
 
-def buildReNetSublayer(incoming,
-                       num_units,
-                       # resetgate=lasagne.layers.Gate(
-                       #     W_in=lasagne.init.Orthogonal(1.0),
-                       #     W_hid=lasagne.init.Orthogonal(1.0),
-                       #     W_cell=lasagne.init.Orthogonal(1.0),
-                       #     b=lasagne.init.Constant(0.),
-                       #     nonlinearity=lasagne.nonlinearities.tanh),
-                       # updategate=lasagne.layers.Gate(
-                       #     W_in=lasagne.init.Orthogonal(1.0),
-                       #     W_hid=lasagne.init.Orthogonal(1.0),
-                       #     W_cell=lasagne.init.Orthogonal(1.0),
-                       #     b=lasagne.init.Constant(0.),
-                       #     nonlinearity=lasagne.nonlinearities.tanh),
-                       # hidden_update=lasagne.layers.Gate(
-                       #     W_in=lasagne.init.Orthogonal(1.0),
-                       #     W_hid=lasagne.init.Orthogonal(1.0),
-                       #     W_cell=lasagne.init.Orthogonal(1.0),
-                       #     b=lasagne.init.Constant(0.),
-                       #     nonlinearity=lasagne.nonlinearities.tanh),
-                       # hid_init=lasagne.init.Constant(0.),
-                       grad_clipping=10,
-                       **kwargs):
+class BidirectionalRNNLayer(lasagne.layers.Layer):
 
-    suffix = kwargs.get("suffix", "0_0")
-
-    # We're using a bidirectional network, which means we will combine two
-    # RecurrentLayers, one with the backwards=True keyword argument.
     # Setting a value for grad_clipping will clip the gradients in the layer
-    # Setting only_return_final=True makes the layers only return their
-    # output for the final time step, which is all we need for this task
-    l_forward = lasagne.layers.GRULayer(
-        incoming,
-        num_units,
-        # resetgate=resetgate,
-        # updategate=updategate,
-        # hidden_update=hidden_update,
-        # hid_init=hid_init,
-        # grad_clipping=grad_clipping,
-        only_return_final=False,
-        name='l_forward_sub_' + suffix)
-    l_backward = lasagne.layers.GRULayer(
-        l_forward,
-        num_units,
-        # resetgate=resetgate,
-        # updategate=updategate,
-        # hidden_update=hidden_update,
-        # hid_init=hid_init,
-        # grad_clipping=grad_clipping,
-        only_return_final=False,
-        backwards=True,
-        name='l_backward_sub_' + suffix)
-    # Now, we'll concatenate the outputs to combine them.
-    l_concat = lasagne.layers.ConcatLayer([l_forward, l_backward], axis=2,)
+    def __init__(self, l_in, num_units,
+                 # resetgate=lasagne.layers.Gate(
+                 #     W_in=lasagne.init.Orthogonal(1.0),
+                 #     W_hid=lasagne.init.Orthogonal(1.0),
+                 #     W_cell=lasagne.init.Orthogonal(1.0),
+                 #     b=lasagne.init.Constant(0.),
+                 #     nonlinearity=lasagne.nonlinearities.tanh),
+                 # updategate=lasagne.layers.Gate(
+                 #     W_in=lasagne.init.Orthogonal(1.0),
+                 #     W_hid=lasagne.init.Orthogonal(1.0),
+                 #     W_cell=lasagne.init.Orthogonal(1.0),
+                 #     b=lasagne.init.Constant(0.),
+                 #     nonlinearity=lasagne.nonlinearities.tanh),
+                 # hidden_update=lasagne.layers.Gate(
+                 #     W_in=lasagne.init.Orthogonal(1.0),
+                 #     W_hid=lasagne.init.Orthogonal(1.0),
+                 #     W_cell=lasagne.init.Orthogonal(1.0),
+                 #     b=lasagne.init.Constant(0.),
+                 #     nonlinearity=lasagne.nonlinearities.tanh),
+                 # hid_init=lasagne.init.Constant(0.),
+                 grad_clipping=0, name='', **kwargs):
+        """BidirectionalRNNLayer
 
-    return l_concat
+        A bidirectional RNN.
+
+        Parameters
+        ----------
+        l_in : lasagne.layers.Layer
+            The input layer
+        num_units : int
+            The number of hidden units of each RNN
+        grad_clipping : int
+            The amount of gradient clipping, optional
+        name = string
+            The name of the layer, optional
+        """
+        super(BidirectionalRNNLayer, self).__init__(l_in, name, **kwargs)
+        self.l_in = l_in
+        self.num_units = num_units
+        self.grad_clipping = grad_clipping
+        self.name = name
+
+        # We use a bidirectional RNN, which means we combine two
+        # RecurrentLayers, the second of which with backwards=True
+        # Setting only_return_final=True makes the layers only return their
+        # output for the final time step, which is all we need for this task
+        l_forward = lasagne.layers.GRULayer(
+            l_in,
+            num_units,
+            # resetgate=resetgate,
+            # updategate=updategate,
+            # hidden_update=hidden_update,
+            # hid_init=hid_init,
+            grad_clipping=grad_clipping,
+            only_return_final=False,
+            name=name + '_l_forward_sub')
+        l_backward = lasagne.layers.GRULayer(
+            l_forward,
+            num_units,
+            # resetgate=resetgate,
+            # updategate=updategate,
+            # hidden_update=hidden_update,
+            # hid_init=hid_init,
+            grad_clipping=grad_clipping,
+            only_return_final=False,
+            backwards=True,
+            name=name + '_l_backward_sub')
+
+        # Now we'll concatenate the outputs to combine them
+        # Note that l_backward is already inverted by Lasagne
+        l_concat = lasagne.layers.ConcatLayer([l_forward, l_backward],
+                                              axis=2, name=name+'_concat')
+
+        # HACK LASAGNE
+        # This will set `self.input_layer`, which is needed by Lasagne to find
+        # the layers with the get_all_layers() helper function in the
+        # case of a layer with sublayers
+        if isinstance(l_concat, tuple):
+            self.input_layer = None
+        else:
+            self.input_layer = l_concat
+
+    def get_output_shape_for(self, input_shape):
+        return list(input_shape[0:2]) + [self.num_units * 2]
+
+    def get_output_for(self, input_var, **kwargs):
+        # HACK LASAGNE
+        # This is needed, jointly with the previous hack, to ensure that
+        # this layer behaves as its last sublayer (namely,
+        # self.input_layer)
+        return input_var
 
 
 class LinearUpsamplingLayer(lasagne.layers.Layer):
 
-    def __init__(self, incoming,
+    def __init__(self,
+                 incoming,
                  expand_height,
                  expand_width,
                  nclasses,
@@ -367,15 +492,16 @@ class LinearUpsamplingLayer(lasagne.layers.Layer):
                  b=lasagne.init.Constant(.0),
                  **kwargs):
         super(LinearUpsamplingLayer, self).__init__(incoming, **kwargs)
-        num_inputs = self.input_shape[-1]
-        num_units = expand_height * expand_width * nclasses
+        nfeatures_in = self.input_shape[-1]
+        nfeatures_out = expand_height * expand_width * nclasses
 
-        self.num_units = num_units
+        self.nfeatures_out = nfeatures_out
+        self.incoming = incoming
         self.expand_height = expand_height
         self.expand_width = expand_width
         self.nclasses = nclasses
-        self.W = self.add_param(W, (num_inputs, num_units), name='W')
-        self.b = self.add_param(b, (num_units,), name='b')
+        self.W = self.add_param(W, (nfeatures_in, nfeatures_out), name='W')
+        self.b = self.add_param(b, (nfeatures_out,), name='b')
 
     def get_output_for(self, input, **kwargs):
         # upsample
@@ -402,7 +528,6 @@ class LinearUpsamplingLayer(lasagne.layers.Layer):
         return pred
 
     def get_output_shape_for(self, input_shape):
-        batch_size, nrows, ncolumns, _ = input_shape
         return (input_shape[0],
                 input_shape[1] * self.expand_height,
                 input_shape[2] * self.expand_width,
