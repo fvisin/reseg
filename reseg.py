@@ -439,7 +439,7 @@ def train(saveto='model.npz',
         # In each epoch, we do a full pass over the training data:
         train_cost = 0
         start_time = time.time()
-        for minibatch in iterate_minibatches(x_train.astype(floatX),
+        for minibatch in iterate_minibatches(x_train,
                                              y_train,
                                              batch_size,
                                              shuffle=shuffle):
@@ -447,7 +447,8 @@ def train(saveto='model.npz',
             inputs, targets, _ = minibatch
 
             if dataset_type == 'intX':
-                inputs = (inputs / 255.).astype(floatX)
+                inputs /= 255.
+            inputs = inputs.astype(floatX)
             targets = targets.astype(intX)
 
             targets_flat = targets.flatten()
@@ -613,7 +614,7 @@ def train(saveto='model.npz',
                 options['history_conf_matrix'] = np.array(history_conf_matrix)
                 options['history_iou_index'] = np.array(history_iou_index)
 
-                print "Saving the options to {}".format(saveto)
+                print "Saving the options to {}".format(saveto[0])
                 pkl.dump(options,
                          open('%s.pkl' % saveto[0], 'wb'))
                 save = True
@@ -649,11 +650,12 @@ def train(saveto='model.npz',
 
     min_valid = np.argmax(np.array(history_errs)[:, 3])
     best = history_errs[min_valid]
-    best = (1-round(best[0], 6), 1-round(best[3], 6), 1-round(best[6], 6))
+    best = (round(best[0], 6), round(best[3], 6), round(best[6], 6),
+            round(best[7], 6), round(best[8], 6))
     print("Global Accuracies :")
     print 'Best: Train ', best[0], 'Valid ', best[1], 'Test ', best[2]
-    print("Test Mean Class Accuracy :")
-    print("Test Mean Intersection Over Union :")
+    print("Test Mean Class Accuracy :", best[3])
+    print("Test Mean Intersection Over Union :", best[4])
 
     if len(saveto) != 1:
         print("Moving temporary model files to {}".format(saveto[1]))
