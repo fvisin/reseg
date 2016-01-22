@@ -19,7 +19,7 @@ from helper_dataset import zero_pad, \
     rgb2illumination_invariant, save_image
 
 
-N_DEBUG = -5
+N_DEBUG = 5
 DEBUG_SAVE_IMG = False
 DEBUG_SAVE_MASK = False
 
@@ -273,21 +273,23 @@ def load_dataset_camvid_segnet(path):
 
 
 def load_data(
-        path=os.path.expanduser('~/exp/datasets/camvid/'),
-        randomize=False,
-        resize_images=True,
-        resize_size=[480, 360],  # w x h : 960x720, 480x360, 320x240
-        color=False,
-        color_space='RGB',
-        normalize=False,
-        classes='subset_11',  # subset_11 , all
-        version='segnet',  # standard, segnet
-        split=[.44, .22],
-        with_filenames=False,
-        load_greylevel_mask=False,
-        save=False,
-        compute_stats='all',
-        rng=None):
+    path=os.path.expanduser('~/exp/datasets/camvid/'),
+    randomize=False,
+    resize_images=True,
+    resize_size=[480, 360],  # w x h : 960x720, 480x360, 320x240
+    color=False,
+    color_space='RGB',
+    normalize=False,
+    classes='subset_11',  # subset_11 , all
+    version='segnet',  # standard, segnet
+    split=[.44, .22],
+    with_filenames=False,
+    load_greylevel_mask=False,
+    save=False,
+    compute_stats='all',
+    rng=None,
+    with_fullmasks=False
+):
     """Dataset loader
 
     Parameter
@@ -404,11 +406,14 @@ def load_data(
     print (test_set_y[0].dtype)
     print (valid_set_y[0].dtype)
     """
-    if with_filenames:
-        return train, valid, test, mean, std, filenames
-    else:
-        return train, valid, test, mean, std
 
+    out_list = [train, valid, test, mean, std]
+    if with_filenames:
+        out_list.append(filenames)
+    if with_fullmasks:
+        out_list.append([])
+
+    return out_list
 
 if __name__ == '__main__':
     load_data(save=False)
