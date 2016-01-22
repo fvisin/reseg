@@ -19,10 +19,10 @@ def buildReSeg(input_shape, n_layers, pheight, pwidth, dim_proj, nclasses,
     weights_loss = T.scalar('weights_loss')
 
     # Tag test values
-    input_var.tag.test_value = np.random.random(
-        input_shape).astype('float32')
-    target_var.tag.test_value = np.random.random(
-        list(input_shape[:3]) + [nclasses]).astype('float32')
+    # input_var.tag.test_value = np.random.random(
+    #     input_shape).astype('float32')
+    # target_var.tag.test_value = np.random.random(
+    #     list(input_shape[:3]) + [nclasses]).astype('float32')
     # theano.config.compute_test_value = 'warn'
 
     # The ReSeg layer

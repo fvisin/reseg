@@ -6,6 +6,7 @@ from skimage.io import imsave
 from config_datasets import color_list_datasets
 import numpy as np
 import theano
+from retrying import retry
 
 floatX = theano.config.floatX
 
@@ -188,6 +189,42 @@ def validate(f_pred,
             cm_normalized, mean_class_acc,
             iou_index, mean_iou_index)
 
+def zipp(vparams, params):
+    """Copy values from one dictionary to another.
+
+    It will copy all the values from the first dictionary to the second
+    dictionary.
+
+    Parameters
+    ----------
+    vparams : dict
+        The dictionary to read the parameters from
+    params :
+        The dictionary to write the parameters to
+    """
+    for kk, vv in vparams.iteritems():
+        params[kk].set_value(vv)
+
+
+def unzip(zipped, prefix=None):
+    """Return a dict of values out of a dict of theano variables
+
+    If a prefix is provided it will attach the prefix to the name of the
+    keys in the dictionary
+
+    Parameters
+    ----------
+    zipped : dict
+        The dictionary of theano variables
+    prefix : string, optional
+        A prefix to be added to the keys of dictionary
+    """
+    prefix = '' if prefix is None else prefix + '_'
+    new_params = OrderedDict()
+    for kk, vv in zipped.iteritems():
+        new_params[prefix + kk] = vv.get_value()
+    return new_params
+
 
 def unroll(deep_list):
     """ Unroll a deep list into a shallow list
@@ -214,3 +251,19 @@ def unroll(deep_list):
             unroll(deep_list[0]) + unroll(deep_list[1:]))
             if type(deep_list) in [list, tuple] and len(deep_list) else
             [deep_list])
+
+
+def retry_if_io_error(exception):
+    """Return True if IOError.
+
+    Return True if we should retry (in this case when it's an IOError),
+    False otherwise.
+    """
+    print "Filesystem error, retrying in 2 seconds..."
+    return isinstance(exception, IOError)
+
+
+@retry(stop_max_attempt_number=10, wait_fixed=2000,
+       retry_on_exception=retry_if_io_error)
+def save_with_retry(saveto, args):
+    np.savez(saveto, *args)
