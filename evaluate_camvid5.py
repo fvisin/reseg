@@ -5,12 +5,12 @@ def main(job_id, params):
     print('Anything printed here will end up in the output directory for job'
           '#%d' % job_id)
     print params
-    trainerr, validerr, testerr = train(
+    train_acc, valid_acc, test_acc, test_mean_class_acc, test_mean_iou = train(
         saveto=params['saveto'],
-        # tmp_saveto=params['tmp-saveto'],
-        # in_nfilters=params['in-nfilters'],
-        # in_filters_size=params['in-filters-size'],
-        # in_filters_stride=params['in-filters-stride'],
+        tmp_saveto=params['tmp-saveto'],
+        in_nfilters=params['in-nfilters'],
+        in_filters_size=params['in-filters-size'],
+        in_filters_stride=params['in-filters-stride'],
         encoder=params['encoder'],
         # intermediate_pred=params['intermediate-pred'],
         dim_proj=params['dim-proj'],
@@ -48,7 +48,7 @@ def main(job_id, params):
         # in_activ='rectifier',
         # out_activ='rectifier',
         patience=50,
-        max_epochs=100,
+        max_epochs=2,
         dispFreq=1,
         validFreq=-1,
         saveFreq=-1,
@@ -65,7 +65,7 @@ def main(job_id, params):
 if __name__ == '__main__':
     main(1, {
         'saveto': 'camvid_models/model_recseg' + __file__[8:-3] + '.npz',
-        # 'tmp-saveto': 'tmp/model_recseg' + __file__[8:-3] + '.npz',
+        'tmp-saveto': 'tmp/model_recseg' + __file__[8:-3] + '.npz',
 
         # Note: with linear_conv you cannot select every filter size.
         # It is not trivial to invert with expand unless they are a
@@ -78,9 +78,9 @@ if __name__ == '__main__':
         # to be (p1, p3),(p2, p4)
         # valid: 1 + (input_dim - filter_dim) / stride_dim
 
-        # 'in-nfilters': None,  # None = disable in convolution
-        # 'in-filters-size': [(6, 6), (4, 4)],
-        # 'in-filters-stride': [(4, 4), (1, 1)],
+        'in-nfilters': None,  # None = disable in convolution
+        'in-filters-size': [(6, 6), (4, 4)],
+        'in-filters-stride': [(4, 4), (1, 1)],
         'encoder': 'gru',
         # 'intermediate-pred': [[False], [True]],
         'dim-proj': [100, 100],
