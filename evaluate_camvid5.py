@@ -54,6 +54,7 @@ def main(job_id, params):
         saveFreq=-1,
         valid_batch_size=params['batch-size'],  # same as batch_size
         dataset='camvid',
+        dataset_type=params['dataset-type'],
         # do_random_flip=True,
         # do_random_shift=True,
         # do_random_invert_color=False,
@@ -110,5 +111,6 @@ if __name__ == '__main__':
         'shuffle': True,
         'resize-images': True,
         'resize-size': (320, 240),  # ATTENTION: w x h (PIL)!! 264x212
+        'dataset-type': 'floatX',
         'reload': False
     })
