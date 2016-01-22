@@ -35,17 +35,16 @@ def buildReSeg(input_shape, n_layers, pheight, pwidth, dim_proj, nclasses,
                          nclasses, stack_sublayers, out_upsampling,
                          out_nfilters, out_filters_size,
                          out_filters_stride, 'reseg')
-
     # Reshape in 2D, last dimension is nclasses, where the softmax is applied
     l_out = lasagne.layers.ReshapeLayer(
         l_reseg,
-        (T.prod(l_reseg.output_shape[0:3]), [3]),
+        (T.prod(l_reseg.output_shape[0:3]), l_reseg.output_shape[3]),
         name='reshape_before_softmax')
 
     l_pred = lasagne.layers.NonlinearityLayer(
-            l_out,
-            nonlinearity=lasagne.nonlinearities.softmax,
-            name="softmax_layer")
+        l_out,
+        nonlinearity=lasagne.nonlinearities.softmax,
+        name="softmax_layer")
 
     # Create a loss expression for training, i.e., a scalar objective we want
     # to minimize (for our multi-class problem, it is the cross-entropy loss):
@@ -138,7 +137,8 @@ class ReSegLayer(lasagne.layers.Layer):
         # ReNet layers
         l_renet = l_in
         for lidx in xrange(n_layers):
-            l_renet = ReNetLayer(l_renet, patch=(pwidth[lidx], pheight[lidx]),
+            l_renet = ReNetLayer(l_renet,
+                                 patch_size=(pwidth[lidx], pheight[lidx]),
                                  n_hidden=dim_proj[lidx],
                                  stack_sublayers=stack_sublayers[lidx],
                                  name=self.name + '_renet' + str(lidx))
