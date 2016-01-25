@@ -25,6 +25,7 @@ from utils import iterate_minibatches, validate
 import camvid
 import daimler
 import fashionista
+import oxford_flowers
 import kitti_road
 
 floatX = theano.config.floatX
@@ -58,6 +59,7 @@ floatX = theano.config.floatX
 datasets = {'camvid': (camvid.load_data, camvid.properties),
             'daimler': (daimler.load_data, daimler.properties),
             'fashionista': (fashionista.load_data, fashionista.properties),
+            'flowers': (oxford_flowers.load_data, oxford_flowers.properties),
             'kitti_road': (kitti_road.load_data, kitti_road.properties)}
 
 

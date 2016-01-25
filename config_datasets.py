@@ -5,8 +5,9 @@ from collections import OrderedDict
 import matplotlib.cm as cm
 
 
+# COLORMAPS
 cmaps = [('Perceptually Uniform Sequential',
-                            ['viridis', 'inferno', 'plasma', 'magma']),
+         ['viridis', 'inferno', 'plasma', 'magma']),
          ('Sequential',     ['Blues', 'BuGn', 'BuPu',
                              'GnBu', 'Greens', 'Greys', 'Oranges', 'OrRd',
                              'PuBu', 'PuBuGn', 'PuRd', 'Purples', 'RdPu',
@@ -25,13 +26,13 @@ cmaps = [('Perceptually Uniform Sequential',
                              'nipy_spectral', 'jet', 'rainbow',
                              'gist_rainbow', 'hsv', 'flag', 'prism'])]
 
+
 # ##### MSCOCO ##### #
 # How to: choose a colormap, generate a linspace from 0 to 1
 # with nclasses bins as follows
 # ATTENTION: 1000 classes are too many for one single colormap..
 # some colors are the same, because the transition is too smooth.
 # we should join more colormaps!
-
 nclasses = 1000
 color_bins = np.linspace(0, 1, nclasses)
 norm = mpl.colors.Normalize(vmin=0, vmax=1)
@@ -81,6 +82,75 @@ headers_camvid = ["Sky", "Building", "Column_Pole", "Road", "Sidewalk",
                   "Tree", "SignSymbol", "Fence", "Car", "Pedestrian",
                   "Bicyclist", "Void"]
 
+# ##### FASHIONISTA ##### #
+color_labels_fashionista = OrderedDict([
+    (0, np.array([128, 128, 128], dtype=np.uint8)),
+    (1, np.array([128, 0, 0], dtype=np.uint8)),
+    (2, np.array([192, 192, 128], dtype=np.uint8)),
+    (3, np.array([128, 64, 128], dtype=np.uint8)),
+    (4, np.array([0, 0, 192], dtype=np.uint8)),
+    (5, np.array([128, 128, 0], dtype=np.uint8)),
+    (6, np.array([192, 128, 128], dtype=np.uint8)),
+    (7, np.array([64, 64, 128], dtype=np.uint8)),
+    (8, np.array([64, 0, 128], dtype=np.uint8)),
+    (9, np.array([64, 64, 0], dtype=np.uint8)),
+    (10, np.array([0, 128, 192], dtype=np.uint8)),
+    (11, np.array([0, 0, 0], dtype=np.uint8)),
+    (12, np.array([128, 128, 128], dtype=np.uint8)),
+    (13, np.array([128, 0, 0], dtype=np.uint8)),
+    (14, np.array([192, 192, 128], dtype=np.uint8)),
+    (15, np.array([128, 64, 128], dtype=np.uint8)),
+    (16, np.array([0, 0, 192], dtype=np.uint8)),
+    (17, np.array([128, 128, 0], dtype=np.uint8)),
+    (18, np.array([192, 128, 128], dtype=np.uint8)),
+    (19, np.array([64, 64, 128], dtype=np.uint8)),
+    (20, np.array([64, 0, 128], dtype=np.uint8)),
+    (21, np.array([64, 64, 0], dtype=np.uint8)),
+    (22, np.array([0, 128, 192], dtype=np.uint8)),
+    (23, np.array([0, 0, 0], dtype=np.uint8)),
+    (24, np.array([128, 128, 128], dtype=np.uint8)),
+    (25, np.array([128, 0, 0], dtype=np.uint8)),
+    (26, np.array([192, 192, 128], dtype=np.uint8)),
+    (27, np.array([128, 64, 128], dtype=np.uint8)),
+    (28, np.array([0, 0, 192], dtype=np.uint8)),
+    (29, np.array([128, 128, 0], dtype=np.uint8)),
+    (30, np.array([192, 128, 128], dtype=np.uint8)),
+    (31, np.array([64, 64, 128], dtype=np.uint8)),
+    (32, np.array([64, 0, 128], dtype=np.uint8)),
+    (33, np.array([64, 64, 0], dtype=np.uint8)),
+    (34, np.array([0, 128, 192], dtype=np.uint8)),
+    (35, np.array([0, 0, 0], dtype=np.uint8)),
+    (36, np.array([128, 128, 128], dtype=np.uint8)),
+    (37, np.array([128, 0, 0], dtype=np.uint8)),
+    (38, np.array([192, 192, 128], dtype=np.uint8)),
+    (39, np.array([128, 64, 128], dtype=np.uint8)),
+    (40, np.array([0, 0, 192], dtype=np.uint8)),
+    (41, np.array([128, 128, 0], dtype=np.uint8)),
+    (42, np.array([192, 128, 128], dtype=np.uint8)),
+    (43, np.array([64, 64, 128], dtype=np.uint8)),
+    (44, np.array([64, 0, 128], dtype=np.uint8)),
+    (45, np.array([64, 64, 0], dtype=np.uint8)),
+    (46, np.array([0, 128, 192], dtype=np.uint8)),
+    (47, np.array([0, 0, 0], dtype=np.uint8)),
+    (48, np.array([128, 128, 128], dtype=np.uint8)),
+    (49, np.array([128, 0, 0], dtype=np.uint8)),
+    (50, np.array([192, 192, 128], dtype=np.uint8)),
+    (51, np.array([128, 64, 128], dtype=np.uint8)),
+    (52, np.array([0, 0, 192], dtype=np.uint8)),
+    (53, np.array([128, 128, 0], dtype=np.uint8)),
+    (54, np.array([192, 128, 128], dtype=np.uint8)),
+    (55, np.array([64, 64, 128], dtype=np.uint8)),
+    (56, np.array([64, 0, 128], dtype=np.uint8)),
+    ])
+
+
+# ##### HORSES ##### #
+color_labels_flowers = OrderedDict([
+    (0, np.array([128, 64, 128], dtype=np.uint8)),  # non road
+    (1, np.array([64, 0, 128], dtype=np.uint8)),  # road
+    ])
+
+
 # ##### HORSES ##### #
 color_labels_horses = OrderedDict([
     (0, np.array([255, 255, 255], dtype=np.uint8)),  # Horse
@@ -94,6 +164,8 @@ headers_horses = ["Horses", "Non-horses"]
 color_labels_datasets = dict()
 color_labels_datasets["camvid"] = color_labels_camvid
 color_labels_datasets["daimler"] = color_labels_daimler
+color_labels_datasets["fashionista"] = color_labels_fashionista
+color_labels_datasets["flowers"] = color_labels_flowers
 color_labels_datasets["kitti_road"] = color_labels_kitti_road
 color_labels_datasets["horses"] = color_labels_horses
 
