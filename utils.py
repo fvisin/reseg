@@ -106,6 +106,7 @@ def validate(f_pred,
     print >>sys.stderr, 'Prediction: ',
 
     if save_seg:
+
         name = dataset
         seg_path = os.path.join('segmentations', name,
                                 saveto.split('/')[-1][:-4])
@@ -116,14 +117,7 @@ def validate(f_pred,
     inputs, targets = data
     conf_matrix = np.zeros([nclasses, nclasses])
 
-    # TODO: move in the main loop if we want to have a fixed random sequence
-    # if n_save > 0:
-    #     save_arr = rng.random_integers(0, 1, len(inputs))
-    # else:
-    #     save_arr = np.ones(len(inputs))
-    # idx = 0
-
-    saved = 0
+    idx = 0
     for minibatch in iterate_minibatches(inputs,
                                          targets,
                                          batchsize,
@@ -143,11 +137,7 @@ def validate(f_pred,
             for im_pred, mini_x, mini_y, filename in zip(preds, x, y, f):
 
                 # save a random set or the entire dataset
-
-                # TODO: if we want a fixed random sequence
-                # if save_arr[idx] and saved < n_save:
-                if (saved < n_save and rng.random_integers(0, 1) or
-                   n_save == -1):
+                if np.logical_or((idx in n_save), (idx == -1)):
 
                     # fix for daimler dataset
                     filename = filename.replace(".pgm", ".png")
@@ -159,7 +149,7 @@ def validate(f_pred,
                                              axis=1)
                     outpath = os.path.join(seg_path, folder_dataset, base)
                     save_image(outpath, im_save)
-                    saved += 1
+                idx += 1
 
     # [WARNING] : we don't consider the unlabelled pixels so the last
     #             row or column of the confusion matrix are usually discarded

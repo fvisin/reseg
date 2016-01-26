@@ -304,6 +304,22 @@ def train(saveto='model.npz',
         with_filenames=True,
         with_fullmasks=True)
 
+    # if n_save is a list then the examples with index in this list are saved
+    # in order to debug during the training
+    # if n_save is an integer, a list of random indexes is generated
+    if isinstance(n_save, (list, tuple, np.ndarray)):
+        n_save = np.array(n_save)
+    elif isinstance(n_save, int):
+        n_min = min(len(train[0]), len(valid[0]), len(test[0]))
+        range_idx = np.arange(n_min)
+        rng.shuffle(range_idx)
+        n_save = range_idx[:n_save]
+    else:
+        n_save = -1
+    options['n_save'] = n_save
+
+    print n_save
+
     # Retrieve basic size informations and split train variables
     x_train, y_train = train
     filenames_train, filenames_valid, filenames_test = filenames
@@ -510,7 +526,6 @@ def train(saveto='model.npz',
 
                 # NOTE : No need to suppress any stochastic layer such as
                 # Dropout, since f_pred exclude any non-deterministic layer
-
                 (train_global_acc,
                  train_conf_matrix,
                  train_conf_matrix_norm,
@@ -542,7 +557,6 @@ def train(saveto='model.npz',
                                                   dataset=dataset,
                                                   saveto=saveto[0],
                                                   )
-
                 (test_global_acc,
                  test_conf_matrix,
                  test_conf_matrix_norm,
