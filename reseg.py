@@ -158,7 +158,7 @@ def train(saveto='model.npz',
     start = time.time()  # use time() to know the actual real-world time
     best_p = {}
     suppress_dropout = theano.shared(np.float32(0.))
-    trng = RandomStreams(0xbeef)
+    # trng = RandomStreams(0xbeef)
     rng = np.random.RandomState(0xbeef)
     saveto = [tmp_saveto, saveto] if tmp_saveto else [saveto]
     if type(pwidth) != list:
@@ -181,7 +181,7 @@ def train(saveto='model.npz',
     options = locals().copy()
     options['recseg_git_commit'] = check_output(
         'git rev-parse HEAD', shell=True)
-    options['trng'] = [el[0].get_value() for el in trng.state_updates]
+    # options['trng'] = [el[0].get_value() for el in trng.state_updates]
     options['history_errs'] = np.array([])
     options['history_conf_matrix'] = np.array([])
     options['history_iou_index'] = np.array([])
@@ -364,6 +364,9 @@ def train(saveto='model.npz',
     target_var = T.ivector('targets')
     weights_loss = T.scalar('weights_loss')
 
+    # Use fixed RandomStream to replicate the experiments
+    lasagne.random.set_rng(rng)
+
     # Tag test values
     # input_var.tag.test_value = np.random.random(
     #     input_shape).astype('float32')
@@ -420,8 +423,8 @@ def train(saveto='model.npz',
                 with np.load('%s' % s) as f:
                     vparams = [f['arr_%d' % i] for i in range(len(f.files))]
                     best_p, param_values = vparams
-                    for i, v in enumerate(options['trng']):
-                        trng.state_updates[i][0].set_value(v)
+                    # for i, v in enumerate(options['trng']):
+                    #     trng.state_updates[i][0].set_value(v)
                     print('Model file loaded: {}'.format(s))
                 lasagne.layers.set_all_param_values(out_layer, param_values)
                 break
@@ -444,6 +447,7 @@ def train(saveto='model.npz',
         for minibatch in iterate_minibatches(x_train,
                                              y_train,
                                              batch_size,
+                                             rng=rng,
                                              shuffle=shuffle):
             st = time.time()
             inputs, targets, _ = minibatch

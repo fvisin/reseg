@@ -11,7 +11,7 @@ from retrying import retry
 floatX = theano.config.floatX
 
 
-def iterate_minibatches(inputs, targets, batchsize, shuffle=False):
+def iterate_minibatches(inputs, targets, batchsize, rng=None, shuffle=False):
     '''Batch iterator
     This is just a simple helper function iterating over training data in
     mini-batches of a particular size, optionally in random order. It assumes
@@ -23,8 +23,10 @@ def iterate_minibatches(inputs, targets, batchsize, shuffle=False):
     '''
     assert len(inputs) == len(targets)
     if shuffle:
+        if rng is None:
+            raise Exception("A Numpy RandomState instance is needed!")
         indices = np.arange(len(inputs))
-        np.random.shuffle(indices)
+        rng.shuffle(indices)
     for start_idx in range(0, len(inputs) - batchsize + 1, batchsize):
         if shuffle:
             excerpt = indices[start_idx:start_idx + batchsize]
