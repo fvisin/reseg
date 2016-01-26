@@ -140,6 +140,7 @@ def train(saveto='model.npz',
           color=True,
           resize_images=True,
           resize_size=-1,
+          n_save=-1,
 
           # Pre-processing
           preprocess_type=None,
@@ -261,6 +262,7 @@ def train(saveto='model.npz',
     # reorder, random_flip/shift/invert_colors, shift pixels
     resize_images = options['resize_images']
     resize_size = options['resize_size']
+    n_save = options['n_save']
 
     # Pre-processing
     preprocess_type = options['preprocess_type']
@@ -517,6 +519,8 @@ def train(saveto='model.npz',
                  train_mean_iou_index) = validate(f_pred, train,
                                                   valid_batch_size,
                                                   nclasses,
+                                                  rng=rng,
+                                                  n_save=n_save,
                                                   filenames=filenames_train,
                                                   folder_dataset='train',
                                                   dataset=dataset,
@@ -531,6 +535,8 @@ def train(saveto='model.npz',
                  valid_mean_iou_index) = validate(f_pred, valid,
                                                   valid_batch_size,
                                                   nclasses,
+                                                  rng=rng,
+                                                  n_save=n_save,
                                                   filenames=filenames_valid,
                                                   folder_dataset='valid',
                                                   dataset=dataset,
@@ -545,6 +551,8 @@ def train(saveto='model.npz',
                  test_mean_iou_index) = validate(f_pred, test,
                                                  valid_batch_size,
                                                  nclasses,
+                                                 rng=rng,
+                                                 n_save=n_save,
                                                  filenames=filenames_test,
                                                  folder_dataset='test',
                                                  dataset=dataset,

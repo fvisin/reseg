@@ -50,7 +50,8 @@ def validate(f_pred,
              data,
              batchsize,
              nclasses=2,
-             shuffle='False',
+             rng=None,
+             n_save=-1,
              dataset='camvid',
              saveto='test_lasagne',
              mean=None, std=None, fullmasks=None,
@@ -114,6 +115,15 @@ def validate(f_pred,
 
     inputs, targets = data
     conf_matrix = np.zeros([nclasses, nclasses])
+
+    # TODO: move in the main loop if we want to have a fixed random sequence
+    # if n_save > 0:
+    #     save_arr = rng.random_integers(0, 1, len(inputs))
+    # else:
+    #     save_arr = np.ones(len(inputs))
+    # idx = 0
+
+    saved = 0
     for minibatch in iterate_minibatches(inputs,
                                          targets,
                                          batchsize,
@@ -130,22 +140,26 @@ def validate(f_pred,
         conf_matrix += cf_m
 
         if save_seg:
-            # save each image of the validation minibatch...
             for im_pred, mini_x, mini_y, filename in zip(preds, x, y, f):
-                # fix for daimler dataset
-                filename = filename.replace(".pgm", ".png")
-                # save segmentation
-                base = os.path.basename(filename)
 
-                outpath = os.path.join(seg_path, folder_dataset, base)
-                save_image(outpath, label2rgb(im_pred, colors=color_list))
+                # save a random set or the entire dataset
 
-                # double check: save also gt and img to see if it's correct
-                # outpath = os.path.join(gt_path, folder_dataset, base)
-                # save_image(outpath, label2rgb(y, colors=color_list))
-                #
-                # outpath = os.path.join(img_path, folder_dataset, base)
-                # save_image(outpath, mini_x)
+                # TODO: if we want a fixed random sequence
+                # if save_arr[idx] and saved < n_save:
+                if (saved < n_save and rng.random_integers(0, 1) or
+                   n_save == -1):
+
+                    # fix for daimler dataset
+                    filename = filename.replace(".pgm", ".png")
+                    # save Image + GT + prediction
+                    base = os.path.basename(filename)
+                    im_pred_rgb = label2rgb(im_pred, colors=color_list)
+                    mini_y_rgb = label2rgb(mini_y, colors=color_list)
+                    im_save = np.concatenate((mini_x, mini_y_rgb, im_pred_rgb),
+                                             axis=1)
+                    outpath = os.path.join(seg_path, folder_dataset, base)
+                    save_image(outpath, im_save)
+                    saved += 1
 
     # [WARNING] : we don't consider the unlabelled pixels so the last
     #             row or column of the confusion matrix are usually discarded
