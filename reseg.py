@@ -345,7 +345,6 @@ def train(saveto='model.npz',
     # How often should we check the output?
     # Now we want to check at each epoch so we check after
     # batch_size minibatchs train iterations
-
     if validFreq == -1:
         validFreq = len(x_train)
     if saveFreq == -1:
@@ -412,6 +411,9 @@ def train(saveto='model.npz',
                                             out_filters_stride)
 
     # Reload the list of the value parameters
+    # TODO Check if the saved params are CudaNDArrays or not, so that we
+    # don't need a GPU to reload the model (I'll do it when you are
+    # done)
     if reload_:
         for s in saveto[::-1]:
             try:
@@ -469,7 +471,7 @@ def train(saveto='model.npz',
             # TODO: preprocess function
             # whiten, LCN, GCN, Local Mean Subtract, or normalize +
             # stochastically augment data
-            # x, y = preprocess(x, 
+            # x, y = preprocess(x,
             #                   options['color'], mean, std,
             #                   options['preprocess_type'],
             #                   y, rng, do_random_flip,
@@ -483,11 +485,11 @@ def train(saveto='model.npz',
             w = 1
             if class_balance in ['median_freq_cost', 'rare_freq_cost']:
                 w = np.sum(w_freq[targets_flat]).astype(floatX)
-            
-            # Training function: params are updated  
+
+            # Training function: params are updated
             cost = f_train(inputs, targets_flat, w)
             ud = time.time() - st
-            
+
             if np.isnan(cost):
                 raise RuntimeError('NaN detected')
             if np.isinf(cost):
