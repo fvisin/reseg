@@ -79,9 +79,48 @@ def buildReSeg(input_shape, n_layers, pheight, pwidth, dim_proj, nclasses,
 
 
 class ReSegLayer(lasagne.layers.Layer):
-    def __init__(self, l_in, n_layers, pheight, pwidth, dim_proj, nclasses,
-                 stack_sublayers, out_upsampling, out_nfilters,
-                 out_filters_size, out_filters_stride, name=''):
+    def __init__(self,
+                 l_in,
+                 n_layers,
+                 pheight,
+                 pwidth,
+                 dim_proj,
+                 nclasses,
+                 stack_sublayers,
+                 # outsampling
+                 out_upsampling_type,
+                 out_nfilters,
+                 out_filters_size,
+                 out_filters_stride,
+                 out_W_init=lasagne.init.GlorotUniform(),
+                 out_b_init=lasagne.init.Constant(0.),
+                 out_nonlinearity=lasagne.nonlinearities.rectify,
+                 # common recurrent layer params
+                 RecurrentNet=lasagne.layers.GRULayer,
+                 nonlinearity=lasagne.nonlinearities.rectify,
+                 hid_init=lasagne.init.Constant(0.),
+                 grad_clipping=0,
+                 precompute_input=True,
+                 mask_input=None,
+                 # GRU specific params
+                 gru_resetgate=lasagne.layers.Gate(W_cell=None),
+                 gru_updategate=lasagne.layers.Gate(W_cell=None),
+                 gru_hidden_update=lasagne.layers.Gate(
+                     W_cell=None,
+                     nonlinearity=lasagne.nonlinearities.tanh),
+                 gru_hid_init=lasagne.init.Constant(0.),
+                 # LSTM specific params
+                 lstm_ingate=lasagne.layers.Gate(),
+                 lstm_forgetgate=lasagne.layers.Gate(),
+                 lstm_cell=lasagne.layers.Gate(
+                     W_cell=None,
+                     nonlinearity=lasagne.nonlinearities.tanh),
+                 lstm_outgate=lasagne.layers.Gate(),
+                 # RNN specific params
+                 rnn_W_in_to_hid=lasagne.init.Uniform(),
+                 rnn_W_hid_to_hid=lasagne.init.Uniform(),
+                 rnn_b=lasagne.init.Constant(0.),
+                 name=''):
         """A ReSeg layer
 
         The ReSeg layer is composed by multiple ReNet layers and an
@@ -104,7 +143,7 @@ class ReSegLayer(lasagne.layers.Layer):
         stack_sublayers : bool
             If True the bidirectional RNNs in the ReNet layers will be
             stacked one over the other. See ReNet for more details.
-        out_upsampling : string
+        out_upsampling_type : string
             The kind of upsampling to be used
         out_nfilters : int
             The number of hidden units of the upsampling layer
@@ -112,6 +151,57 @@ class ReSegLayer(lasagne.layers.Layer):
             The size of the upsampling filters, if any
         out_filters_stride : tuple
             The stride of the upsampling filters, if any
+        out_W_init : Theano shared variable, numpy array or callable
+            Initializer for W
+        out_b_init : Theano shared variable, numpy array or callable
+            Initializer for b
+        out_nonlinearity : Theano shared variable, numpy array or callable
+            The nonlinearity to be applied after the upsampling
+        RecurrentNet : lasagne.layers.Layer
+            A recurrent layer class
+        nonlinearity : callable or None
+            The nonlinearity that is applied to the output. If
+            None is provided, no nonlinearity will be applied.
+        hid_init : callable, np.ndarray, theano.shared or
+                   lasagne.layers.Layer
+            Initializer for initial hidden state
+        grad_clipping : float
+            If nonzero, the gradient messages are clipped to the given value
+            during the backward pass.
+        precompute_input : bool
+            If True, precompute input_to_hid before iterating through the
+            sequence. This can result in a speedup at the expense of an
+            increase in memory usage.
+        mask_input : lasagne.layers.Layer
+            Layer which allows for a sequence mask to be input, for when
+            sequences are of variable length. Default None, which means no mask
+            will be supplied (i.e. all sequences are of the same length).
+        gru_resetgate : lasagne.layers.Gate
+            Parameters for the reset gate, if RecurrentNet is GRU
+        gru_updategate : lasagne.layers.Gate
+            Parameters for the update gate, if RecurrentNet is GRU
+        gru_hidden_update : lasagne.layers.Gate
+            Parameters for the hidden update, if RecurrentNet is GRU
+        gru_hid_init : callable, np.ndarray, theano.shared or
+                       lasagne.layers.Layer
+            Initializer for initial hidden state, if RecurrentNet is GRU
+        lstm_ingate : lasagne.layers.Gate
+            Parameters for the input gate, if RecurrentNet is LSTM
+        lstm_forgetgate : lasagne.layers.Gate
+            Parameters for the forget gate, if RecurrentNet is LSTM
+        lstm_cell : lasagne.layers.Gate
+            Parameters for the cell computation, if RecurrentNet is LSTM
+        lstm_outgate : lasagne.layers.Gate
+            Parameters for the output gate, if RecurrentNet is LSTM
+        rnn_W_in_to_hid : Theano shared variable, numpy array or callable
+            Initializer for input-to-hidden weight matrix, if
+            RecurrentNet is RecurrentLayer
+        rnn_W_hid_to_hid : Theano shared variable, numpy array or callable
+            Initializer for hidden-to-hidden weight matrix, if
+            RecurrentNet is RecurrentLayer
+        rnn_b : Theano shared variable, numpy array, callable or None
+            Initializer for bias vector, if RecurrentNet is
+            RecurrentLaye. If None is provided there will be no bias
         name : string
             The name of the layer, optional
         """
@@ -124,7 +214,7 @@ class ReSegLayer(lasagne.layers.Layer):
         self.dim_proj = dim_proj
         self.nclasses = nclasses
         self.stack_sublayers = stack_sublayers
-        self.out_upsampling = out_upsampling
+        self.out_upsampling_type = out_upsampling_type
         self.out_nfilters = out_nfilters
         self.out_filters_size = out_filters_size
         self.out_filters_stride = out_filters_stride
@@ -141,6 +231,26 @@ class ReSegLayer(lasagne.layers.Layer):
                                  patch_size=(pwidth[lidx], pheight[lidx]),
                                  n_hidden=dim_proj[lidx],
                                  stack_sublayers=stack_sublayers[lidx],
+                                 RecurrentNet=RecurrentNet,
+                                 nonlinearity=nonlinearity,
+                                 hid_init=hid_init,
+                                 grad_clipping=grad_clipping,
+                                 precompute_input=precompute_input,
+                                 mask_input=mask_input,
+                                 # GRU specific params
+                                 gru_resetgate=gru_resetgate,
+                                 gru_updategate=gru_updategate,
+                                 gru_hidden_update=gru_hidden_update,
+                                 gru_hid_init=gru_hid_init,
+                                 # LSTM specific params
+                                 lstm_ingate=lstm_ingate,
+                                 lstm_forgetgate=lstm_forgetgate,
+                                 lstm_cell=lstm_cell,
+                                 lstm_outgate=lstm_outgate,
+                                 # RNN specific params
+                                 rnn_W_in_to_hid=rnn_W_in_to_hid,
+                                 rnn_W_hid_to_hid=rnn_W_hid_to_hid,
+                                 rnn_b=rnn_b,
                                  name=self.name + '_renet' + str(lidx))
             out_shape = get_output_shape(l_renet)
 
@@ -152,8 +262,7 @@ class ReSegLayer(lasagne.layers.Layer):
                 out_shape))
 
         # UPSAMPLING
-        # TODO We could use InverseLayer to invert the input conv layers (?)
-        if out_upsampling == 'grad':
+        if out_upsampling_type == 'grad':
             # We use a custom Deconv layer: UpsampleConv2DDNNLayer
             # the input has to be in the 'bc01' shape
             l_renet_out = lasagne.layers.dimshuffle(l_renet,
@@ -166,12 +275,16 @@ class ReSegLayer(lasagne.layers.Layer):
                         num_filters=num_filters,
                         filter_size=filter_size,
                         stride=filter_stride,
-                        pad='same')
+                        # pad='same',
+                        # untie_biases=False,
+                        W=out_W_init,
+                        b=out_b_init,
+                        nonlinearity=out_nonlinearity)
 
             l_out = lasagne.layers.DimshuffleLayer(renet_layer_out,
                                                    (0, 2, 3, 1))
 
-        elif out_upsampling == 'linear':
+        elif out_upsampling_type == 'linear':
             expand_height = np.prod(pheight)
             expand_width = np.prod(pwidth)
             l_out = LinearUpsamplingLayer(l_renet,
@@ -203,8 +316,36 @@ class ReSegLayer(lasagne.layers.Layer):
 
 class ReNetLayer(lasagne.layers.Layer):
 
-    def __init__(self, l_in, patch_size=(2, 2), n_hidden=50,
-                 stack_sublayers=False, name='', **kwargs):
+    def __init__(self,
+                 l_in,
+                 patch_size=(2, 2),
+                 n_hidden=50,
+                 stack_sublayers=False,
+                 RecurrentNet=lasagne.layers.GRULayer,
+                 nonlinearity=lasagne.nonlinearities.rectify,
+                 hid_init=lasagne.init.Constant(0.),
+                 grad_clipping=0,
+                 precompute_input=True,
+                 mask_input=None,
+                 # GRU specific params
+                 gru_resetgate=lasagne.layers.Gate(W_cell=None),
+                 gru_updategate=lasagne.layers.Gate(W_cell=None),
+                 gru_hidden_update=lasagne.layers.Gate(
+                     W_cell=None,
+                     nonlinearity=lasagne.nonlinearities.tanh),
+                 gru_hid_init=lasagne.init.Constant(0.),
+                 # LSTM specific params
+                 lstm_ingate=lasagne.layers.Gate(),
+                 lstm_forgetgate=lasagne.layers.Gate(),
+                 lstm_cell=lasagne.layers.Gate(
+                     W_cell=None,
+                     nonlinearity=lasagne.nonlinearities.tanh),
+                 lstm_outgate=lasagne.layers.Gate(),
+                 # RNN specific params
+                 rnn_W_in_to_hid=lasagne.init.Uniform(),
+                 rnn_W_hid_to_hid=lasagne.init.Uniform(),
+                 rnn_b=lasagne.init.Constant(0.),
+                 name='', **kwargs):
         """A ReNet layer
 
         Each ReNet layer is composed by 4 RNNs (or 2 bidirectional RNNs):
@@ -231,6 +372,51 @@ class ReNetLayer(lasagne.layers.Layer):
             bidirectional RNN will read the feature map coming from the
             first bidirectional RNN. If False, all the RNNs will read
             the input. Optional
+        RecurrentNet : lasagne.layers.Layer
+            A recurrent layer class
+        nonlinearity : callable or None
+            The nonlinearity that is applied to the output. If
+            None is provided, no nonlinearity will be applied.
+        hid_init : callable, np.ndarray, theano.shared or
+                   lasagne.layers.Layer
+            Initializer for initial hidden state
+        grad_clipping : float
+            If nonzero, the gradient messages are clipped to the given value
+            during the backward pass.
+        precompute_input : bool
+            If True, precompute input_to_hid before iterating through the
+            sequence. This can result in a speedup at the expense of an
+            increase in memory usage.
+        mask_input : lasagne.layers.Layer
+            Layer which allows for a sequence mask to be input, for when
+            sequences are of variable length. Default None, which means no mask
+            will be supplied (i.e. all sequences are of the same length).
+        gru_resetgate : lasagne.layers.Gate
+            Parameters for the reset gate, if RecurrentNet is GRU
+        gru_updategate : lasagne.layers.Gate
+            Parameters for the update gate, if RecurrentNet is GRU
+        gru_hidden_update : lasagne.layers.Gate
+            Parameters for the hidden update, if RecurrentNet is GRU
+        gru_hid_init : callable, np.ndarray, theano.shared or
+                       lasagne.layers.Layer
+            Initializer for initial hidden state, if RecurrentNet is GRU
+        lstm_ingate : lasagne.layers.Gate
+            Parameters for the input gate, if RecurrentNet is LSTM
+        lstm_forgetgate : lasagne.layers.Gate
+            Parameters for the forget gate, if RecurrentNet is LSTM
+        lstm_cell : lasagne.layers.Gate
+            Parameters for the cell computation, if RecurrentNet is LSTM
+        lstm_outgate : lasagne.layers.Gate
+            Parameters for the output gate, if RecurrentNet is LSTM
+        rnn_W_in_to_hid : Theano shared variable, numpy array or callable
+            Initializer for input-to-hidden weight matrix, if
+            RecurrentNet is RecurrentLayer
+        rnn_W_hid_to_hid : Theano shared variable, numpy array or callable
+            Initializer for hidden-to-hidden weight matrix, if
+            RecurrentNet is RecurrentLayer
+        rnn_b : Theano shared variable, numpy array, callable or None
+            Initializer for bias vector, if RecurrentNet is
+            RecurrentLaye. If None is provided there will be no bias
         name : string
             The name of the layer, optional
         """
@@ -281,6 +467,26 @@ class ReNetLayer(lasagne.layers.Layer):
         l_sub0 = BidirectionalRNNLayer(
             l_sub0,
             n_hidden,
+            RecurrentNet=RecurrentNet,
+            nonlinearity=nonlinearity,
+            hid_init=hid_init,
+            grad_clipping=grad_clipping,
+            precompute_input=precompute_input,
+            mask_input=mask_input,
+            # GRU specific params
+            gru_resetgate=gru_resetgate,
+            gru_updategate=gru_updategate,
+            gru_hidden_update=gru_hidden_update,
+            gru_hid_init=gru_hid_init,
+            # LSTM specific params
+            lstm_ingate=lstm_ingate,
+            lstm_forgetgate=lstm_forgetgate,
+            lstm_cell=lstm_cell,
+            lstm_outgate=lstm_outgate,
+            # RNN specific params
+            rnn_W_in_to_hid=rnn_W_in_to_hid,
+            rnn_W_hid_to_hid=rnn_W_hid_to_hid,
+            rnn_b=rnn_b,
             name=self.name + "_sub0_renetsub")
 
         # Revert dimshuffle
@@ -328,6 +534,26 @@ class ReNetLayer(lasagne.layers.Layer):
         l_sub1 = BidirectionalRNNLayer(
             l_sub1,
             n_hidden,
+            RecurrentNet=RecurrentNet,
+            nonlinearity=nonlinearity,
+            hid_init=hid_init,
+            grad_clipping=grad_clipping,
+            precompute_input=precompute_input,
+            mask_input=mask_input,
+            # GRU specific params
+            gru_resetgate=gru_resetgate,
+            gru_updategate=gru_updategate,
+            gru_hidden_update=gru_hidden_update,
+            gru_hid_init=gru_hid_init,
+            # LSTM specific params
+            lstm_ingate=lstm_ingate,
+            lstm_forgetgate=lstm_forgetgate,
+            lstm_cell=lstm_cell,
+            lstm_outgate=lstm_outgate,
+            # RNN specific params
+            rnn_W_in_to_hid=rnn_W_in_to_hid,
+            rnn_W_hid_to_hid=rnn_W_hid_to_hid,
+            rnn_b=rnn_b,
             name=self.name + "_sub1_renetsub")
 
         # Revert the last dimshuffle
@@ -388,30 +614,38 @@ class ReNetLayer(lasagne.layers.Layer):
 class BidirectionalRNNLayer(lasagne.layers.Layer):
 
     # Setting a value for grad_clipping will clip the gradients in the layer
-    def __init__(self, l_in, num_units,
-                 # resetgate=lasagne.layers.Gate(
-                 #     W_in=lasagne.init.Orthogonal(1.0),
-                 #     W_hid=lasagne.init.Orthogonal(1.0),
-                 #     W_cell=lasagne.init.Orthogonal(1.0),
-                 #     b=lasagne.init.Constant(0.),
-                 #     nonlinearity=lasagne.nonlinearities.tanh),
-                 # updategate=lasagne.layers.Gate(
-                 #     W_in=lasagne.init.Orthogonal(1.0),
-                 #     W_hid=lasagne.init.Orthogonal(1.0),
-                 #     W_cell=lasagne.init.Orthogonal(1.0),
-                 #     b=lasagne.init.Constant(0.),
-                 #     nonlinearity=lasagne.nonlinearities.tanh),
-                 # hidden_update=lasagne.layers.Gate(
-                 #     W_in=lasagne.init.Orthogonal(1.0),
-                 #     W_hid=lasagne.init.Orthogonal(1.0),
-                 #     W_cell=lasagne.init.Orthogonal(1.0),
-                 #     b=lasagne.init.Constant(0.),
-                 #     nonlinearity=lasagne.nonlinearities.tanh),
-                 # hid_init=lasagne.init.Constant(0.),
-                 grad_clipping=0, name='', **kwargs):
-        """BidirectionalRNNLayer
-
-        A bidirectional RNN.
+    def __init__(
+            self,
+            l_in,
+            num_units,
+            RecurrentNet=lasagne.layers.GRULayer,
+            # common parameters
+            nonlinearity=lasagne.nonlinearities.rectify,
+            hid_init=lasagne.init.Constant(0.),
+            grad_clipping=0,
+            precompute_input=True,
+            mask_input=None,
+            # GRU specific params
+            gru_resetgate=lasagne.layers.Gate(W_cell=None),
+            gru_updategate=lasagne.layers.Gate(W_cell=None),
+            gru_hidden_update=lasagne.layers.Gate(
+                W_cell=None,
+                nonlinearity=lasagne.nonlinearities.tanh),
+            gru_hid_init=lasagne.init.Constant(0.),
+            # LSTM specific params
+            lstm_ingate=lasagne.layers.Gate(),
+            lstm_forgetgate=lasagne.layers.Gate(),
+            lstm_cell=lasagne.layers.Gate(
+                W_cell=None,
+                nonlinearity=lasagne.nonlinearities.tanh),
+            lstm_outgate=lasagne.layers.Gate(),
+            # RNN specific params
+            rnn_W_in_to_hid=lasagne.init.Uniform(),
+            rnn_W_hid_to_hid=lasagne.init.Uniform(),
+            rnn_b=lasagne.init.Constant(0.),
+            name='',
+            **kwargs):
+        """A Bidirectional RNN Layer
 
         Parameters
         ----------
@@ -419,8 +653,51 @@ class BidirectionalRNNLayer(lasagne.layers.Layer):
             The input layer
         num_units : int
             The number of hidden units of each RNN
-        grad_clipping : int
-            The amount of gradient clipping, optional
+        RecurrentNet : lasagne.layers.Layer
+            A recurrent layer class
+        nonlinearity : callable or None
+            The nonlinearity that is applied to the output. If
+            None is provided, no nonlinearity will be applied.
+        hid_init : callable, np.ndarray, theano.shared or
+                   lasagne.layers.Layer
+            Initializer for initial hidden state
+        grad_clipping : float
+            If nonzero, the gradient messages are clipped to the given value
+            during the backward pass.
+        precompute_input : bool
+            If True, precompute input_to_hid before iterating through the
+            sequence. This can result in a speedup at the expense of an
+            increase in memory usage.
+        mask_input : lasagne.layers.Layer
+            Layer which allows for a sequence mask to be input, for when
+            sequences are of variable length. Default None, which means no mask
+            will be supplied (i.e. all sequences are of the same length).
+        gru_resetgate : lasagne.layers.Gate
+            Parameters for the reset gate, if RecurrentNet is GRU
+        gru_updategate : lasagne.layers.Gate
+            Parameters for the update gate, if RecurrentNet is GRU
+        gru_hidden_update : lasagne.layers.Gate
+            Parameters for the hidden update, if RecurrentNet is GRU
+        gru_hid_init : callable, np.ndarray, theano.shared or
+                       lasagne.layers.Layer
+            Initializer for initial hidden state, if RecurrentNet is GRU
+        lstm_ingate : lasagne.layers.Gate
+            Parameters for the input gate, if RecurrentNet is LSTM
+        lstm_forgetgate : lasagne.layers.Gate
+            Parameters for the forget gate, if RecurrentNet is LSTM
+        lstm_cell : lasagne.layers.Gate
+            Parameters for the cell computation, if RecurrentNet is LSTM
+        lstm_outgate : lasagne.layers.Gate
+            Parameters for the output gate, if RecurrentNet is LSTM
+        rnn_W_in_to_hid : Theano shared variable, numpy array or callable
+            Initializer for input-to-hidden weight matrix, if
+            RecurrentNet is RecurrentLayer
+        rnn_W_hid_to_hid : Theano shared variable, numpy array or callable
+            Initializer for hidden-to-hidden weight matrix, if
+            RecurrentNet is RecurrentLayer
+        rnn_b : Theano shared variable, numpy array, callable or None
+            Initializer for bias vector, if RecurrentNet is
+            RecurrentLaye. If None is provided there will be no bias
         name = string
             The name of the layer, optional
         """
@@ -434,27 +711,52 @@ class BidirectionalRNNLayer(lasagne.layers.Layer):
         # RecurrentLayers, the second of which with backwards=True
         # Setting only_return_final=True makes the layers only return their
         # output for the final time step, which is all we need for this task
-        l_forward = lasagne.layers.GRULayer(
+
+        # GRU
+        if RecurrentNet.__name__ == 'GRULayer':
+            rnn_params = dict(
+                resetgate=gru_resetgate,
+                updategate=gru_updategate,
+                hidden_update=gru_hidden_update,
+                hid_init=gru_hid_init)
+
+        # LSTM
+        elif RecurrentNet.__name__ == 'LSTMLayer':
+            rnn_params = dict(
+                ingate=lstm_ingate,
+                forgetgate=lstm_forgetgate,
+                cell=lstm_cell,
+                outgate=lstm_outgate)
+
+        # RNN
+        elif RecurrentNet.__name__ == 'RecurrentLayer':
+            rnn_params = dict(
+                W_in_to_hid=rnn_W_in_to_hid,
+                W_hid_to_hid=rnn_W_hid_to_hid,
+                b=rnn_b)
+        else:
+            raise NotImplementedError('RecurrentNet not implemented')
+
+        common_params = dict(
+            nonlinearity=nonlinearity,
+            hid_init=hid_init,
+            grad_clipping=grad_clipping,
+            precompute_input=precompute_input,
+            mask_input=mask_input,
+            only_return_final=False)
+        rnn_params.update(common_params)
+
+        l_forward = RecurrentNet(
             l_in,
             num_units,
-            # resetgate=resetgate,
-            # updategate=updategate,
-            # hidden_update=hidden_update,
-            # hid_init=hid_init,
-            grad_clipping=grad_clipping,
-            only_return_final=False,
-            name=name + '_l_forward_sub')
-        l_backward = lasagne.layers.GRULayer(
+            name=name + '_l_forward_sub',
+            **rnn_params)
+        l_backward = RecurrentNet(
             l_forward,
             num_units,
-            # resetgate=resetgate,
-            # updategate=updategate,
-            # hidden_update=hidden_update,
-            # hid_init=hid_init,
-            grad_clipping=grad_clipping,
-            only_return_final=False,
             backwards=True,
-            name=name + '_l_backward_sub')
+            name=name + '_l_backward_sub',
+            **rnn_params)
 
         # Now we'll concatenate the outputs to combine them
         # Note that l_backward is already inverted by Lasagne
@@ -500,6 +802,7 @@ class LinearUpsamplingLayer(lasagne.layers.Layer):
         self.expand_height = expand_height
         self.expand_width = expand_width
         self.nclasses = nclasses
+        # ``regularizable`` and ``trainable`` by default
         self.W = self.add_param(W, (nfeatures_in, nfeatures_out), name='W')
         self.b = self.add_param(b, (nfeatures_out,), name='b')
 
@@ -666,6 +969,19 @@ class UpsampleConv2DDNNLayer(lasagne.layers.Layer):
                  b=lasagne.init.Constant(0.),
                  nonlinearity=lasagne.nonlinearities.rectify,
                  flip_filters=False, **kwargs):
+        """__init__
+
+        Parameters
+        ----------
+        incoming :
+            The
+        num_filters :
+            The
+        filter_size :
+            The
+        stride :
+            The
+        """
         super(UpsampleConv2DDNNLayer, self).__init__(incoming, **kwargs)
         if nonlinearity is None:
             self.nonlinearity = lasagne.nonlinearities.identity
