@@ -136,7 +136,6 @@ def train(saveto='model.npz',
 
           # Dataset
           dataset='horses',
-          dataset_type='intX',
           color_space='RGB',
           color=True,
           resize_images=True,
@@ -368,10 +367,7 @@ def train(saveto='model.npz',
         train, _, _, _, _ = load_data(
             resize_images=resize_images, resize_size=resize_size,
             color=color, color_space=color_space, rng=rng)
-        if dataset_type == 'intX':
-            x_tag = (train[0][0:batch_size] / 255.).astype(floatX)
-        else:
-            x_tag = (train[0][0:batch_size]).astype(floatX)
+        x_tag = (train[0][0:batch_size] / 255.).astype(floatX)
         y_tag = (train[1][0:batch_size]).astype(intX)
 
         if x_tag.ndim == 1:
@@ -448,9 +444,7 @@ def train(saveto='model.npz',
             st = time.time()
             inputs, targets, _ = minibatch
 
-            if dataset_type == 'intX':
-                inputs /= 255.
-            inputs = inputs.astype(floatX)
+            inputs = (inputs / 255.).astype(floatX)
             targets = targets.astype(intX)
 
             targets_flat = targets.flatten()
@@ -682,7 +676,6 @@ def train(saveto='model.npz',
     # with np.load('model.npz') as f:
     #     param_values = [f['arr_%d' % i] for i in range(len(f.files))]
     # lasagne.layers.set_all_param_values(network, param_values)
-
 
 
 def show_seg(dataset_name, n_exp, dataset_set, mode='sequential', id=-1):
