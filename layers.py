@@ -8,23 +8,13 @@ from theano.sandbox.cuda.dnn import GpuDnnConvDesc, GpuDnnConvGradI
 from theano.sandbox.cuda.basic_ops import gpu_contiguous, gpu_alloc_empty
 
 
-def buildReSeg(input_shape, n_layers, pheight, pwidth, dim_proj, nclasses,
+def buildReSeg(input_shape, input_var,
+               n_layers, pheight, pwidth, dim_proj, nclasses,
                stack_sublayers, out_upsampling, out_nfilters, out_filters_size,
                out_filters_stride):
     '''Helper function to build a ReSeg network
 
     '''
-    input_var = T.tensor4('inputs')
-    target_var = T.ivector('targets')
-    weights_loss = T.scalar('weights_loss')
-
-    # Tag test values
-    # input_var.tag.test_value = np.random.random(
-    #     input_shape).astype('float32')
-    # target_var.tag.test_value = np.random.random(
-    #     list(input_shape[:3]) + [nclasses]).astype('float32')
-    # theano.config.compute_test_value = 'warn'
-
     # The ReSeg layer
     print('Input shape: ' + str(input_shape))
     l_in = lasagne.layers.InputLayer(shape=input_shape,
@@ -46,36 +36,41 @@ def buildReSeg(input_shape, n_layers, pheight, pwidth, dim_proj, nclasses,
         nonlinearity=lasagne.nonlinearities.softmax,
         name="softmax_layer")
 
-    # Create a loss expression for training, i.e., a scalar objective we want
-    # to minimize (for our multi-class problem, it is the cross-entropy loss):
-    prediction = lasagne.layers.get_output(l_pred)
-
-    loss = lasagne.objectives.categorical_crossentropy(
-        prediction, target_var)
-    loss = weights_loss * loss.mean()
-
     # TODO We could add some weight decay as well here,
     # see lasagne.regularization.
 
-    params = lasagne.layers.get_all_params(l_pred, trainable=True)
-    # Stochastic Gradient Descent (SGD) with Nesterov momentum
-    # updates = lasagne.updates.nesterov_momentum(
-    #         loss, params, learning_rate=LEARNING_RATE, momentum=0.9)
-    updates = lasagne.updates.adadelta(loss, params)
-
     # Compile the function that gives back the mask prediction
+    # with deterministic=True we exclude stochastic layers such as dropout
     prediction = lasagne.layers.get_output(l_pred, deterministic=True)
     f_pred = theano.function(
         [input_var],
         T.argmax(prediction, axis=1).reshape(input_shape[:3]))
 
+    return l_pred, f_pred
+
+
+def buildTrain(input_var, target_var, weights_loss, l_pred):
+    '''Helper function to build the training function
+
+    '''
+    # Create a loss expression for training, i.e., a scalar objective we want
+    # to minimize (for our multi-class problem, it is the cross-entropy loss):
+    prediction = lasagne.layers.get_output(l_pred)
+    loss = lasagne.objectives.categorical_crossentropy(
+        prediction, target_var)
+    loss = weights_loss * loss.mean()
+    params = lasagne.layers.get_all_params(l_pred, trainable=True)
+    # Stochastic Gradient Descent (SGD) with Nesterov momentum
+    # updates = lasagne.updates.nesterov_momentum(
+    #         loss, params, learning_rate=LEARNING_RATE, momentum=0.9)
+    updates = lasagne.updates.adadelta(loss, params)
     # Compile the function that performs a training step on a mini-batch
     # (by using the updates dictionary) and returns the corresponding training
     # loss:
     f_train = theano.function([input_var, target_var, weights_loss], loss,
                               updates=updates)
 
-    return l_out, f_pred, f_train
+    return f_train
 
 
 class ReSegLayer(lasagne.layers.Layer):

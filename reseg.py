@@ -19,7 +19,7 @@ from theano.compile.nanguardmode import NanGuardMode
 # Local application/library specific imports
 from config_datasets import color_list_datasets
 from get_info_model import print_params
-from layers import buildReSeg
+from layers import buildReSeg, buildTrain
 from subprocess import check_output
 from utils import (iterate_minibatches, validate, save_with_retry, unroll,
                    unzip)
@@ -290,7 +290,7 @@ def train(saveto='model.npz',
              'gcn',
              'local_mean_sub']), ("The preprocessing method choosen is not "
                                   "implemented")
-
+    # ### LOADING DATA ### #
     print("Loading data ...")
     load_data, properties = get_dataset(dataset)
     train, valid, test, mean, std, filenames, fullmasks = load_data(
@@ -313,7 +313,8 @@ def train(saveto='model.npz',
                            '%d' % nclasses)
     print '# of classes:', nclasses
 
-    # Class Balancing: TODO: check if it works...
+    # ### CLASS BALANCING ### #
+    # TODO: check if it works...
     w_freq = 1
     if class_balance in ['median_freq_cost', 'rare_freq_cost']:
         u_train, c_train = np.unique(y_train, return_counts=True)
@@ -355,12 +356,21 @@ def train(saveto='model.npz',
         if std.ndim == 3:
             std = np.expand_dims(std, axis=3)
 
+    # ### BUILDING THEANO VARIABLES ### #
     print("Building model ...")
-    x_ = T.tensor4('x', dtype=floatX)
-    y_ = T.tensor3('y', dtype=intX)
-    # Test value
-    # x_.tag.test_value = numpy.random.randn(1, 40, 20, 3).astype('float32')
-    # y_.tag.test_value = numpy.zeros((1, 40, 20)).astype('int32')
+
+    input_shape = (batch_size, cheight, cwidth, cchannels)
+    input_var = T.tensor4('inputs')
+    target_var = T.ivector('targets')
+    weights_loss = T.scalar('weights_loss')
+
+    # Tag test values
+    # input_var.tag.test_value = np.random.random(
+    #     input_shape).astype('float32')
+    # target_var.tag.test_value = np.random.random(
+    #     list(input_shape[:3]) + [nclasses]).astype('float32')
+    # theano.config.compute_test_value = 'warn'
+
     if debug:
         print "DEBUG MODE: loading tag.test_value ..."
         load_data, properties = get_dataset(dataset)
@@ -385,26 +395,20 @@ def train(saveto='model.npz',
             y_tag = y_tag[:, dh/2:(-dh+dh/2 if -dh+dh/2 else None),
                           dw/2:(-dw+dw/2 if -dw/dw/2 else None), ...]
 
-        x_.tag.test_value = x_tag
-        y_.tag.test_value = y_tag
+        input_var.tag.test_value = x_tag
+        target_var.tag.test_value = y_tag.flatten()
         theano.config.compute_test_value = 'warn'
-
 
     # TODO: we can use a preprocess function here if we want to preprocess
     # the entire dataset
 
-    input_shape = (batch_size, cheight, cwidth, cchannels)
-    out_layer, f_pred, f_train = buildReSeg(input_shape,
-                                            n_layers,
-                                            pheight,
-                                            pwidth,
-                                            dim_proj,
-                                            nclasses,
-                                            stack_sublayers,
-                                            out_upsampling,
-                                            out_nfilters,
-                                            out_filters_size,
-                                            out_filters_stride)
+    out_layer, f_pred = buildReSeg(input_shape, input_var,
+                                   n_layers, pheight, pwidth,
+                                   dim_proj, nclasses,
+                                   stack_sublayers, out_upsampling,
+                                   out_nfilters, out_filters_size,
+                                   out_filters_stride)
+    f_train = buildTrain(input_var, target_var, weights_loss, out_layer)
 
     # Reload the list of the value parameters
     # TODO Check if the saved params are CudaNDArrays or not, so that we
@@ -424,7 +428,7 @@ def train(saveto='model.npz',
             except IOError:
                 continue
 
-    # MAIN TRAINING LOOP
+    # ### MAIN TRAINING LOOP ### #
     # Finally, launch the training loop.
     print("Starting training...")
     # We iterate over epochs:
