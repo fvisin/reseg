@@ -41,7 +41,7 @@ def main(job_id, params):
         reload_=params['reload'],
         resize_images=params['resize-images'],
         resize_size=params['resize-size'],
-
+        n_save=params['n-save'],
         # fixed params
         # in_init='glorot',
         # out_init='glorot',
@@ -54,13 +54,12 @@ def main(job_id, params):
         saveFreq=-1,
         valid_batch_size=params['batch-size'],  # same as batch_size
         dataset='camvid',
-        dataset_type=params['dataset-type'],
         # do_random_flip=True,
         # do_random_shift=True,
         # do_random_invert_color=False,
         # shift_pixels=2
     )
-    return validerr
+    return train_acc, valid_acc, test_acc, test_mean_class_acc, test_mean_iou
 
 if __name__ == '__main__':
     main(1, {
@@ -108,9 +107,9 @@ if __name__ == '__main__':
         # 'patch-size': (9, 9),
         # 'max-patches': 1e5,
         'class-balance': None,
+        'n-save': 3,
         'shuffle': True,
         'resize-images': True,
         'resize-size': (320, 240),  # ATTENTION: w x h (PIL)!! 264x212
-        'dataset-type': 'floatX',
         'reload': False
     })
