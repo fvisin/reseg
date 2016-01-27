@@ -435,7 +435,8 @@ def train(saveto='model.npz',
                                    stack_sublayers, out_upsampling,
                                    out_nfilters, out_filters_size,
                                    out_filters_stride)
-    f_train = buildTrain(input_var, target_var, weights_loss, out_layer)
+    f_train = buildTrain(input_var, target_var, weights_loss, out_layer,
+                         weight_decay)
 
     # Reload the list of the value parameters
     # TODO Check if the saved params are CudaNDArrays or not, so that we

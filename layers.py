@@ -36,9 +36,6 @@ def buildReSeg(input_shape, input_var,
         nonlinearity=lasagne.nonlinearities.softmax,
         name="softmax_layer")
 
-    # TODO We could add some weight decay as well here,
-    # see lasagne.regularization.
-
     # Compile the function that gives back the mask prediction
     # with deterministic=True we exclude stochastic layers such as dropout
     prediction = lasagne.layers.get_output(l_pred, deterministic=True)
@@ -49,7 +46,7 @@ def buildReSeg(input_shape, input_var,
     return l_pred, f_pred
 
 
-def buildTrain(input_var, target_var, weights_loss, l_pred):
+def buildTrain(input_var, target_var, weights_loss, l_pred, weight_decay=0.):
     '''Helper function to build the training function
 
     '''
@@ -58,6 +55,14 @@ def buildTrain(input_var, target_var, weights_loss, l_pred):
     prediction = lasagne.layers.get_output(l_pred)
     loss = lasagne.objectives.categorical_crossentropy(
         prediction, target_var)
+
+    if weight_decay > 0 :
+        l2_penalty = lasagne.regularization.regularize_network_params(
+            l_pred,
+            lasagne.regularization.l2,
+            tags={'regularizable': True})
+        loss += l2_penalty * weight_decay
+
     loss = weights_loss * loss.mean()
     params = lasagne.layers.get_all_params(l_pred, trainable=True)
     # Stochastic Gradient Descent (SGD) with Nesterov momentum
