@@ -36,7 +36,7 @@ def print_params(fp, print_commit_hash=False, plot=False,
     if dataset is None:
         headers = [str(i) for i in range(0, fp['out_nfilters'][-1])]
 
-    errs = numpy.array(fp['history_errs'])
+    errs = numpy.array(fp['history_acc'])
     conf_matrices = numpy.array(fp['history_conf_matrix'])
     iou_indeces = numpy.array(fp['history_iou_index'])
 
