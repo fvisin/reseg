@@ -481,7 +481,6 @@ def train(saveto='model.npz',
             nsamples += len(inputs)
             uidx += 1
 
-            # TODO get rid of this!!
             inputs = (inputs / 255.).astype(floatX)
             targets = targets.astype(intX)
             # TODO Don't we need shape information?
