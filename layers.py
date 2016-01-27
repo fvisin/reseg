@@ -652,7 +652,8 @@ class BidirectionalRNNLayer(lasagne.layers.Layer):
             A recurrent layer class
         nonlinearity : callable or None
             The nonlinearity that is applied to the output. If
-            None is provided, no nonlinearity will be applied.
+            None is provided, no nonlinearity will be applied. Only for
+            LSTMLayer and RecurrentLayer
         hid_init : callable, np.ndarray, theano.shared or
                    lasagne.layers.Layer
             Initializer for initial hidden state
@@ -718,6 +719,7 @@ class BidirectionalRNNLayer(lasagne.layers.Layer):
         # LSTM
         elif RecurrentNet.__name__ == 'LSTMLayer':
             rnn_params = dict(
+                nonlinearity=nonlinearity,
                 ingate=lstm_ingate,
                 forgetgate=lstm_forgetgate,
                 cell=lstm_cell,
@@ -726,6 +728,7 @@ class BidirectionalRNNLayer(lasagne.layers.Layer):
         # RNN
         elif RecurrentNet.__name__ == 'RecurrentLayer':
             rnn_params = dict(
+                nonlinearity=nonlinearity,
                 W_in_to_hid=rnn_W_in_to_hid,
                 W_hid_to_hid=rnn_W_hid_to_hid,
                 b=rnn_b)
@@ -733,7 +736,6 @@ class BidirectionalRNNLayer(lasagne.layers.Layer):
             raise NotImplementedError('RecurrentNet not implemented')
 
         common_params = dict(
-            nonlinearity=nonlinearity,
             hid_init=hid_init,
             grad_clipping=grad_clipping,
             precompute_input=precompute_input,
