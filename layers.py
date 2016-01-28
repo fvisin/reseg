@@ -1,5 +1,4 @@
 import numpy as np
-import theano
 import theano.tensor as T
 import lasagne
 from lasagne.layers import get_output_shape

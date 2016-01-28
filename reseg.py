@@ -24,6 +24,7 @@ from get_info_model import print_params
 from layers import ReSegLayer
 from subprocess import check_output
 from utils import iterate_minibatches, validate, save_with_retry, unroll
+from vgg16 import build_model as buildVgg16
 
 # Datasets import
 # TODO these should go into preprocess/helper dataset
@@ -61,10 +62,18 @@ def buildReSeg(input_shape, input_var,
                                      input_var=input_var,
                                      name="input_layer")
 
-    # pretrained vgg16
-    # l_vgg16 = buildVgg16(l_in)['conv5_3']
-    # vgg16_w = pickle.load(open('vgg16.pkl'))
-    # lasagne.layers.set_all_param_values(l_vgg16, vgg16_w['param_values'][:-6])
+    # Pretrained vgg16
+    use_pretrained_vgg = True
+    if use_pretrained_vgg:
+        # Convert to batchsize, ch, rows, cols
+        l_in = lasagne.layers.DimshuffleLayer(l_in, (0, 3, 1, 2))
+        l_vgg16 = buildVgg16(l_in, False, False)['conv5_3']
+        # Reload weights
+        vgg16_w = pickle.load(open('vgg16.pkl'))
+        lasagne.layers.set_all_param_values(l_vgg16,
+                                            vgg16_w['param values'][:-6])
+        # Back to batchsize, rows, cols, ch
+        l_in = lasagne.layers.DimshuffleLayer(l_vgg16, (0, 2, 3, 1))
 
     l_reseg = ReSegLayer(l_in, n_layers, pheight, pwidth, dim_proj,
                          nclasses, stack_sublayers, out_upsampling,
@@ -101,7 +110,7 @@ def buildTrain(input_var, target_var, weights_loss, l_pred, weight_decay=0.):
     loss = lasagne.objectives.categorical_crossentropy(
         prediction, target_var)
 
-    if weight_decay > 0 :
+    if weight_decay > 0:
         l2_penalty = lasagne.regularization.regularize_network_params(
             l_pred,
             lasagne.regularization.l2,
