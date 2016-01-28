@@ -1,5 +1,6 @@
 import os
 import sys
+from skimage import img_as_float
 from sklearn.metrics import confusion_matrix
 from skimage.color import label2rgb
 from skimage.io import imsave
@@ -145,8 +146,11 @@ def validate(f_pred,
                     base = os.path.basename(filename)
                     im_pred_rgb = label2rgb(im_pred, colors=color_list)
                     mini_y_rgb = label2rgb(mini_y, colors=color_list)
-                    im_save = np.concatenate((mini_x, mini_y_rgb, im_pred_rgb),
-                                             axis=1)
+                    im_save = np.concatenate(
+                            (img_as_float(mini_x),
+                             mini_y_rgb,
+                             im_pred_rgb),
+                            axis=1)
                     outpath = os.path.join(seg_path, folder_dataset, base)
                     save_image(outpath, im_save)
                 idx += 1
