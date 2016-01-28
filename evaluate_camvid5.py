@@ -78,7 +78,7 @@ if __name__ == '__main__':
         # valid: 1 + (input_dim - filter_dim) / stride_dim
 
         'in-nfilters': None,  # None = disable in convolution
-        'in-filters-size': [(6, 6), (4, 4)],
+        'in-filters-size': [(5, 5), (5, 5)],
         'in-filters-stride': [(4, 4), (1, 1)],
         'encoder': 'gru',
         # 'intermediate-pred': [[False], [True]],
@@ -107,7 +107,7 @@ if __name__ == '__main__':
         # 'patch-size': (9, 9),
         # 'max-patches': 1e5,
         'class-balance': None,
-        'n-save': 3,
+        'n-save': 20,
         'shuffle': True,
         'resize-images': True,
         'resize-size': (320, 240),  # ATTENTION: w x h (PIL)!! 264x212
