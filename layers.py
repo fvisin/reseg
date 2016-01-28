@@ -1,5 +1,4 @@
 import numpy as np
-import pickle
 import theano
 import theano.tensor as T
 import lasagne
@@ -7,7 +6,6 @@ from lasagne.layers import get_output_shape
 from theano.sandbox.cuda.dnn import dnn_conv
 from theano.sandbox.cuda.dnn import GpuDnnConvDesc, GpuDnnConvGradI
 from theano.sandbox.cuda.basic_ops import gpu_contiguous, gpu_alloc_empty
-# from vgg16 import build_model as buildVgg16
 
 
 class ReSegLayer(lasagne.layers.Layer):
@@ -27,6 +25,13 @@ class ReSegLayer(lasagne.layers.Layer):
                  out_W_init=lasagne.init.GlorotUniform(),
                  out_b_init=lasagne.init.Constant(0.),
                  out_nonlinearity=lasagne.nonlinearities.rectify,
+                 # input ConvLayers
+                 in_nfilters=(50, 55),
+                 in_filters_size=((3, 3), (3, 3)),
+                 in_filters_stride=((1, 1), (1, 1)),
+                 in_W_init=lasagne.init.GlorotUniform(),
+                 in_b_init=lasagne.init.Constant(0.),
+                 in_nonlinearity=lasagne.nonlinearities.rectify,
                  # common recurrent layer params
                  RecurrentNet=lasagne.layers.GRULayer,
                  nonlinearity=lasagne.nonlinearities.rectify,
@@ -154,7 +159,48 @@ class ReSegLayer(lasagne.layers.Layer):
 
         (batch_size, cheight, cwidth, cchannels) = get_output_shape(l_in)
 
-        # TODO insert input conv layers
+        # Input ConvLayers
+        if in_nfilters:
+            # the input layer of the Conv2DLayer should be in bc01 format
+            l_in_conv = lasagne.layers.DimshuffleLayer(
+                l_in,
+                (0, 3, 1, 2),
+                name=self.name + "_input_conv_dimshuffle")
+
+            for i, (nf, f_size, stride) in enumerate(
+                    zip(in_nfilters, in_filters_size, in_filters_stride)):
+
+                # TODO: not sure that this is true..
+                # abstract2DConv is working or not?
+
+                # Conv2DLayer will create a convolutional layer using
+                # T.nnet.conv2d, Theano's default convolution.
+                # On compilation for GPU, Theano replaces this with a
+                # cuDNN-based implementation if available,
+                # otherwise falls back to a gemm-based implementation
+
+                # pad='valid' -> out_size = (input_size - f_size + 1) / stride
+                l_in_conv = lasagne.layers.Conv2DLayer(
+                    l_in_conv,
+                    num_filters=nf,
+                    filter_size=f_size,
+                    stride=stride,
+                    W=in_W_init,
+                    b=in_b_init,
+                    pad='valid',
+                    name=self.name + '_input_conv_layer' + str(i)
+                )
+                out_shape = get_output_shape(l_in_conv)
+                out_shape = (out_shape[0], out_shape[2],
+                             out_shape[3], out_shape[1])
+
+                print('RecSeg: After in-convnet: {}'.format(out_shape))
+
+            # invert the dimshuffle before input convolution
+            l_in = lasagne.layers.DimshuffleLayer(
+                l_in_conv,
+                (0, 2, 3, 1),
+                name=self.name + "_input_conv_undimshuffle")
 
         # ReNet layers
         l_renet = l_in

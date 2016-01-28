@@ -1,5 +1,6 @@
 # Standard library imports
 import cPickle as pkl
+import pickle
 import collections
 import matplotlib.pyplot as plt
 import os
@@ -15,6 +16,7 @@ from skimage.color import label2rgb
 import theano
 from theano import tensor as T
 from theano.compile.nanguardmode import NanGuardMode
+# from vgg16 import build_model as buildVgg16
 
 # Local application/library specific imports
 from config_datasets import color_list_datasets
