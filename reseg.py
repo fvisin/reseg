@@ -23,7 +23,7 @@ from config_datasets import color_list_datasets
 from get_info_model import print_params
 from layers import ReSegLayer
 from subprocess import check_output
-from utils import iterate_minibatches, validate, save_with_retry, unroll
+from utils import iterate_minibatches, validate, save_with_retry
 from vgg16 import build_model as buildVgg16
 
 # Datasets import
@@ -229,10 +229,11 @@ def train(saveto='model.npz',
         pheight = [pheight] * len(dim_proj)
     # TODO Intermediate pred should probably have length nlayer - 1,
     # i.e., we don't need to enforce the last one to be True
-    if intermediate_pred is None:
-        intermediate_pred = [[False] * (len(dim_proj) - 1)] + [[False, True]]
-    if not unroll(intermediate_pred)[-1]:
-        raise ValueError('The last value of intermediate_pred should be True')
+    # TODO We are not using it for now
+    # if intermediate_pred is None:
+    #     intermediate_pred = [[False] * (len(dim_proj) - 1)] + [[False, True]]
+    # if not unroll(intermediate_pred)[-1]:
+    #    raise ValueError('The last value of intermediate_pred should be True')
     if not resize_images and valid_batch_size != 1:
         raise ValueError('When images are not resized valid_batch_size'
                          'should be 1')
@@ -402,9 +403,9 @@ def train(saveto='model.npz',
     nclasses = max([np.max(el) for el in y_train]) + 1
 
     # TODO Do we still need it?
-    if out_nfilters[-1] != nclasses:
-        raise RuntimeError('The last element of out_nfilters should be'
-                           '%d' % nclasses)
+    # if out_nfilters[-1] != nclasses:
+    #     raise RuntimeError('The last element of out_nfilters should be'
+    #                        '%d' % nclasses)
     print '# of classes:', nclasses
 
     # Class balancing
@@ -542,7 +543,6 @@ def train(saveto='model.npz',
 
             inputs = (inputs / 255.).astype(floatX)
             targets = targets.astype(intX)
-            # TODO Don't we need shape information?
             targets_flat = targets.flatten()
 
             # TODO Move to preprocessing fn
@@ -808,14 +808,14 @@ def show_seg(dataset_name, n_exp, dataset_set, mode='sequential', id=-1):
         mask_pred = load(outpath)
 
         fig = plt.figure(figsize=(20, 10))
-        a = fig.add_subplot(1, 3, 1)
-        imgplot = plt.imshow(im)
+        fig.add_subplot(1, 3, 1)
+        plt.imshow(im)
 
-        a = fig.add_subplot(1, 3, 2)
+        fig.add_subplot(1, 3, 2)
         plt.imshow(mask_rgb)
 
-        a = fig.add_subplot(1, 3, 3)
-        imgplot = plt.imshow(mask_pred)
+        fig.add_subplot(1, 3, 3)
+        plt.imshow(mask_pred)
         plt.show(block=False)
         raw_input("Press Enter to show the next image")
 
