@@ -1,4 +1,5 @@
 import numpy as np
+import pickle
 import theano
 import theano.tensor as T
 import lasagne
@@ -6,20 +7,25 @@ from lasagne.layers import get_output_shape
 from theano.sandbox.cuda.dnn import dnn_conv
 from theano.sandbox.cuda.dnn import GpuDnnConvDesc, GpuDnnConvGradI
 from theano.sandbox.cuda.basic_ops import gpu_contiguous, gpu_alloc_empty
+from vgg16 import build_model as buildVgg16
 
 
 def buildReSeg(input_shape, input_var,
                n_layers, pheight, pwidth, dim_proj, nclasses,
                stack_sublayers, out_upsampling, out_nfilters, out_filters_size,
                out_filters_stride):
-    '''Helper function to build a ReSeg network
+    '''Helper function to build a ReSeg network'''
 
-    '''
-    # The ReSeg layer
     print('Input shape: ' + str(input_shape))
     l_in = lasagne.layers.InputLayer(shape=input_shape,
                                      input_var=input_var,
                                      name="input_layer")
+
+    # pretrained vgg16
+    l_vgg16 = buildVgg16(l_in)['conv5_3']
+    vgg16_w = pickle.load(open('vgg16.pkl'))
+    lasagne.layers.set_all_param_values(l_vgg16, vgg16_w['param_values'][:-6])
+
 
     l_reseg = ReSegLayer(l_in, n_layers, pheight, pwidth, dim_proj,
                          nclasses, stack_sublayers, out_upsampling,
