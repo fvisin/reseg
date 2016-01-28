@@ -124,6 +124,7 @@ def validate(f_pred,
                                          batchsize,
                                          shuffle=False):
         x, y, mini_idx = minibatch
+        x = img_as_float(x)
         f = filenames[mini_idx]
         preds = f_pred(x.astype(floatX))
 
@@ -147,7 +148,7 @@ def validate(f_pred,
                     im_pred_rgb = label2rgb(im_pred, colors=color_list)
                     mini_y_rgb = label2rgb(mini_y, colors=color_list)
                     im_save = np.concatenate(
-                            (img_as_float(mini_x),
+                            (mini_x,
                              mini_y_rgb,
                              im_pred_rgb),
                             axis=1)
