@@ -25,7 +25,7 @@ class ReSegLayer(lasagne.layers.Layer):
                  out_b_init=lasagne.init.Constant(0.),
                  out_nonlinearity=lasagne.nonlinearities.rectify,
                  # input ConvLayers
-                 in_nfilters=(50, 55),
+                 in_nfilters=None,
                  in_filters_size=((3, 3), (3, 3)),
                  in_filters_stride=((1, 1), (1, 1)),
                  in_W_init=lasagne.init.GlorotUniform(),
@@ -238,28 +238,38 @@ class ReSegLayer(lasagne.layers.Layer):
                 n_rnns, pheight[lidx], pwidth[lidx], dim_proj[lidx],
                 out_shape))
 
-        # UPSAMPLING
+        # Upsampling
         if out_upsampling_type == 'grad':
             # We use a custom Deconv layer: UpsampleConv2DDNNLayer
             # the input has to be in the 'bc01' shape
-            l_renet_out = lasagne.layers.dimshuffle(l_renet,
-                                                    (0, 3, 1, 2))
+            l_renet_out = lasagne.layers.DimshuffleLayer(
+                l_renet,
+                (0, 3, 1, 2),
+                name=self.name + '_grad_dimshuffle')
 
-            for i, (num_filters, filter_size, filter_stride) in enumerate(zip(
+            for i, (nf, f_size, stride) in enumerate(zip(
                     out_nfilters, out_filters_size, out_filters_stride)):
                 renet_layer_out = UpsampleConv2DDNNLayer(
-                        l_renet_out,
-                        num_filters=num_filters,
-                        filter_size=filter_size,
-                        stride=filter_stride,
-                        # pad='same',
-                        # untie_biases=False,
-                        W=out_W_init,
-                        b=out_b_init,
-                        nonlinearity=out_nonlinearity)
+                    l_renet_out,
+                    num_filters=nf,
+                    filter_size=f_size,
+                    stride=stride,
+                    # pad='same',
+                    # untie_biases=False,
+                    W=out_W_init,
+                    b=out_b_init,
+                    nonlinearity=out_nonlinearity)
+                out_shape = get_output_shape(renet_layer_out)
+                out_shape = (out_shape[0], out_shape[2],
+                             out_shape[3], out_shape[1])
 
-            l_out = lasagne.layers.DimshuffleLayer(renet_layer_out,
-                                                   (0, 2, 3, 1))
+                print('Upsample: After grad @ nf: {}, fs: {}, str: {} : {}'.
+                      format(nf, f_size, stride, out_shape))
+
+            l_out = lasagne.layers.DimshuffleLayer(
+                renet_layer_out,
+                (0, 2, 3, 1),
+                name=self.name + '_grad_undimshuffle')
 
         elif out_upsampling_type == 'linear':
             expand_height = np.prod(pheight)

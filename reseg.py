@@ -53,8 +53,15 @@ def get_dataset(name):
 
 def buildReSeg(input_shape, input_var,
                n_layers, pheight, pwidth, dim_proj, nclasses,
-               stack_sublayers, out_upsampling, out_nfilters, out_filters_size,
-               out_filters_stride):
+               stack_sublayers,
+               out_upsampling,
+               out_nfilters,
+               out_filters_size,
+               out_filters_stride,
+               in_nfilters=None,
+               in_filters_size=((3, 3), (3, 3)),
+               in_filters_stride=((1, 1), (1, 1))
+               ):
     '''Helper function to build a ReSeg network'''
 
     print('Input shape: ' + str(input_shape))
@@ -78,7 +85,11 @@ def buildReSeg(input_shape, input_var,
     l_reseg = ReSegLayer(l_in, n_layers, pheight, pwidth, dim_proj,
                          nclasses, stack_sublayers, out_upsampling,
                          out_nfilters, out_filters_size,
-                         out_filters_stride, name='reseg')
+                         out_filters_stride,
+                         in_nfilters=in_nfilters,
+                         in_filters_size=in_filters_size,
+                         in_filters_stride=in_filters_stride,
+                         name='reseg')
     # Reshape in 2D, last dimension is nclasses, where the softmax is applied
     l_out = lasagne.layers.ReshapeLayer(
         l_reseg,
@@ -493,7 +504,10 @@ def train(saveto='model.npz',
                                    dim_proj, nclasses,
                                    stack_sublayers, out_upsampling,
                                    out_nfilters, out_filters_size,
-                                   out_filters_stride)
+                                   out_filters_stride,
+                                   in_nfilters=in_nfilters,
+                                   in_filters_size=in_filters_size,
+                                   in_filters_stride=in_filters_stride)
     f_train = buildTrain(input_var, target_var, weights_loss, out_layer,
                          weight_decay)
 
@@ -550,12 +564,12 @@ def train(saveto='model.npz',
             if 'linear' in out_upsampling:
                 dh = inputs.shape[1] % np.prod(options['pheight'])
                 dw = inputs.shape[2] % np.prod(options['pwidth'])
-                x = inputs[:, dh/2:(-dh+dh/2 if -dh+dh/2 else None),
+                inputs = inputs[:, dh/2:(-dh+dh/2 if -dh+dh/2 else None),
                            dw/2:(-dw+dw/2 if -dw/dw/2 else None), ...]
-                y = targets[:, dh/2:(-dh+dh/2 if -dh+dh/2 else None),
+                targets = targets[:, dh/2:(-dh+dh/2 if -dh+dh/2 else None),
                             dw/2:(-dw+dw/2 if -dw/dw/2 else None), ...]
 
-            print 'Image size: {}'.format(x.shape)
+            print 'Image size: {}'.format(inputs.shape)
 
             # TODO: preprocess function
             # whiten, LCN, GCN, Local Mean Subtract, or normalize +
