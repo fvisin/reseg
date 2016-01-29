@@ -925,23 +925,14 @@ class DeconvLayer(lasagne.layers.Layer):
 
         filters = gpu_contiguous(self.W)
         state_below = gpu_contiguous(input)
-        out_shape = T.stack(self.output_shape)
+        out_shape = T.as_tensor_variable(self.output_shape)
 
         desc = GpuDnnConvDesc(border_mode=self.pad,
                               subsample=self.stride,
-                              conv_mode=conv_mode)(out_shape, filters.shape)
+                              conv_mode=conv_mode)(out_shape,
+                                                   filters.shape)
         grad = GpuDnnConvGradI()(filters, state_below,
                                  gpu_alloc_empty(*out_shape), desc)
-
-        # image = T.alloc(0., *self.output_shape)
-        # conved = dnn_conv(img=image,
-        #                   kerns=self.W,
-        #                   subsample=self.stride,
-        #                   border_mode=self.pad,
-        #                   conv_mode=conv_mode
-        #                   )
-        #
-        # grad = T.grad(conved.sum(), wrt=image, known_grads={conved: input})
 
         if self.b is None:
             activation = grad
