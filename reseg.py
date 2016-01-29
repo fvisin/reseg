@@ -78,7 +78,7 @@ def buildReSeg(input_shape, input_var,
     l_reseg = ReSegLayer(l_in, n_layers, pheight, pwidth, dim_proj,
                          nclasses, stack_sublayers, out_upsampling,
                          out_nfilters, out_filters_size,
-                         out_filters_stride, 'reseg')
+                         out_filters_stride, name='reseg')
     # Reshape in 2D, last dimension is nclasses, where the softmax is applied
     l_out = lasagne.layers.ReshapeLayer(
         l_reseg,
