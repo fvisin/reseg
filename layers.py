@@ -1,3 +1,4 @@
+import collections
 import numpy as np
 import theano.tensor as T
 import lasagne
@@ -159,7 +160,7 @@ class ReSegLayer(lasagne.layers.Layer):
         (batch_size, cheight, cwidth, cchannels) = get_output_shape(l_in)
 
         # Input ConvLayers
-        if in_nfilters:
+        if isinstance(in_nfilters, collections.Iterable):
             # the input layer of the Conv2DLayer should be in bc01 format
             l_in_conv = lasagne.layers.DimshuffleLayer(
                 l_in,

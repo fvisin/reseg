@@ -16,7 +16,6 @@ from skimage.color import label2rgb
 import theano
 from theano import tensor as T
 from theano.compile.nanguardmode import NanGuardMode
-# from vgg16 import build_model as buildVgg16
 
 # Local application/library specific imports
 from config_datasets import color_list_datasets
@@ -51,16 +50,48 @@ def get_dataset(name):
 
 
 def buildReSeg(input_shape, input_var,
-               n_layers, pheight, pwidth, dim_proj, nclasses,
-               stack_sublayers,
+               n_layers, pheight, pwidth, dim_proj,
+               nclasses, stack_sublayers,
+               # upsampling
                out_upsampling,
                out_nfilters,
                out_filters_size,
                out_filters_stride,
+               out_W_init=lasagne.init.GlorotUniform(),
+               out_b_init=lasagne.init.Constant(0.),
+               out_nonlinearity=lasagne.nonlinearities.rectify,
+               # input ConvLayers
                in_nfilters=None,
-               in_filters_size=((3, 3), (3, 3)),
-               in_filters_stride=((1, 1), (1, 1))
-               ):
+               in_filters_size=(),
+               in_filters_stride=(),
+               in_W_init=lasagne.init.GlorotUniform(),
+               in_b_init=lasagne.init.Constant(0.),
+               in_nonlinearity=lasagne.nonlinearities.rectify,
+               # common recurrent layer params
+               RecurrentNet=lasagne.layers.GRULayer,
+               nonlinearity=lasagne.nonlinearities.rectify,
+               hid_init=lasagne.init.Constant(0.),
+               grad_clipping=0,
+               precompute_input=True,
+               mask_input=None,
+               # GRU specific params
+               gru_resetgate=lasagne.layers.Gate(W_cell=None),
+               gru_updategate=lasagne.layers.Gate(W_cell=None),
+               gru_hidden_update=lasagne.layers.Gate(
+                   W_cell=None,
+                   nonlinearity=lasagne.nonlinearities.tanh),
+               gru_hid_init=lasagne.init.Constant(0.),
+               # LSTM specific params
+               lstm_ingate=lasagne.layers.Gate(),
+               lstm_forgetgate=lasagne.layers.Gate(),
+               lstm_cell=lasagne.layers.Gate(
+                   W_cell=None,
+                   nonlinearity=lasagne.nonlinearities.tanh),
+               lstm_outgate=lasagne.layers.Gate(),
+               # RNN specific params
+               rnn_W_in_to_hid=lasagne.init.Uniform(),
+               rnn_W_hid_to_hid=lasagne.init.Uniform(),
+               rnn_b=lasagne.init.Constant(0.)):
     '''Helper function to build a ReSeg network'''
 
     print('Input shape: ' + str(input_shape))
@@ -69,8 +100,7 @@ def buildReSeg(input_shape, input_var,
                                      name="input_layer")
 
     # Pretrained vgg16
-    use_pretrained_vgg = False
-    if use_pretrained_vgg:
+    if in_nfilters == 'vgg':
         from vgg16 import build_model as buildVgg16
         # Convert to batchsize, ch, rows, cols
         l_in = lasagne.layers.DimshuffleLayer(l_in, (0, 3, 1, 2))
@@ -85,12 +115,43 @@ def buildReSeg(input_shape, input_var,
         l_in = lasagne.layers.DimshuffleLayer(l_vgg16, (0, 2, 3, 1))
 
     l_reseg = ReSegLayer(l_in, n_layers, pheight, pwidth, dim_proj,
-                         nclasses, stack_sublayers, out_upsampling,
-                         out_nfilters, out_filters_size,
+                         nclasses, stack_sublayers,
+                         # upsampling
+                         out_upsampling,
+                         out_nfilters,
+                         out_filters_size,
                          out_filters_stride,
+                         out_W_init=out_W_init,
+                         out_b_init=out_b_init,
+                         out_nonlinearity=out_nonlinearity,
+                         # input ConvLayers
                          in_nfilters=in_nfilters,
                          in_filters_size=in_filters_size,
                          in_filters_stride=in_filters_stride,
+                         in_W_init=in_W_init,
+                         in_b_init=in_b_init,
+                         in_nonlinearity=in_nonlinearity,
+                         # common recurrent layer params
+                         RecurrentNet=RecurrentNet,
+                         nonlinearity=nonlinearity,
+                         hid_init=hid_init,
+                         grad_clipping=grad_clipping,
+                         precompute_input=precompute_input,
+                         mask_input=mask_input,
+                         # GRU specific params
+                         gru_resetgate=gru_resetgate,
+                         gru_updategate=gru_updategate,
+                         gru_hidden_update=gru_hidden_update,
+                         gru_hid_init=gru_hid_init,
+                         # LSTM specific params
+                         lstm_ingate=lstm_ingate,
+                         lstm_forgetgate=lstm_forgetgate,
+                         lstm_cell=lstm_cell,
+                         lstm_outgate=lstm_outgate,
+                         # RNN specific params
+                         rnn_W_in_to_hid=rnn_W_in_to_hid,
+                         rnn_W_hid_to_hid=rnn_W_hid_to_hid,
+                         rnn_b=rnn_b,
                          name='reseg')
     # Reshape in 2D, last dimension is nclasses, where the softmax is applied
     l_out = lasagne.layers.ReshapeLayer(
@@ -150,28 +211,53 @@ def train(saveto='model.npz',
 
           # Input Conv layers
           in_nfilters=None,  # None = no input convolution
-          in_filters_size=[],
-          in_filters_stride=[],
-          in_init='glorot',
-          in_activ='tanh',
+          in_filters_size=(),
+          in_filters_stride=(),
+          in_W_init=lasagne.init.GlorotUniform(),
+          in_b_init=lasagne.init.Constant(0.),
+          in_nonlinearity=lasagne.nonlinearities.rectify,
 
           # RNNs layers
-          encoder='gru',
           dim_proj=[32, 32],
           pwidth=2,
           pheight=2,
-          rnn_init='norm_weight',
-          rnn_activation='tanh',
           stack_sublayers=(True, True),
-          clip_grad_threshold=0.,
+          RecurrentNet=lasagne.layers.GRULayer,
+          nonlinearity=lasagne.nonlinearities.rectify,
+          hid_init=lasagne.init.Constant(0.),
+          grad_clipping=0,
+          precompute_input=True,
+          mask_input=None,
+
+          # GRU specific params
+          gru_resetgate=lasagne.layers.Gate(W_cell=None),
+          gru_updategate=lasagne.layers.Gate(W_cell=None),
+          gru_hidden_update=lasagne.layers.Gate(
+              W_cell=None,
+              nonlinearity=lasagne.nonlinearities.tanh),
+          gru_hid_init=lasagne.init.Constant(0.),
+
+          # LSTM specific params
+          lstm_ingate=lasagne.layers.Gate(),
+          lstm_forgetgate=lasagne.layers.Gate(),
+          lstm_cell=lasagne.layers.Gate(
+              W_cell=None,
+              nonlinearity=lasagne.nonlinearities.tanh),
+          lstm_outgate=lasagne.layers.Gate(),
+
+          # RNN specific params
+          rnn_W_in_to_hid=lasagne.init.Uniform(),
+          rnn_W_hid_to_hid=lasagne.init.Uniform(),
+          rnn_b=lasagne.init.Constant(0.),
 
           # Output upsampling layers
           out_upsampling='grad',
           out_nfilters=None,  # The last number should be the num of classes
           out_filters_size=(1, 1),
           out_filters_stride=None,
-          out_init='glorot',
-          out_activ='identity',
+          out_W_init=lasagne.init.GlorotUniform(),
+          out_b_init=lasagne.init.Constant(0.),
+          out_nonlinearity=lasagne.nonlinearities.rectify,
 
           # Prediction, Softmax
           intermediate_pred=None,
@@ -185,7 +271,7 @@ def train(saveto='model.npz',
           dropout_x_rate=0.8,
 
           # Optimization method
-          optimizer='rmsprop',
+          optimizer='adadelta',
           lrate=0.01,
           weight_decay=0.,  # l2 reg
           weight_noise=0.,
@@ -226,7 +312,7 @@ def train(saveto='model.npz',
           do_random_shift=False,
           do_random_invert_color=False,
           shift_pixels=2,
-          reload_=False,
+          reload_=False
           ):
 
     # Set options and history_acc
@@ -296,26 +382,47 @@ def train(saveto='model.npz',
     in_nfilters = options['in_nfilters']
     in_filters_size = options['in_filters_size']
     in_filters_stride = options['in_filters_stride']
-    in_init = options['in_init'] if 'in_init' in options else 'glorot'
-    in_activ = options['in_activ'] if 'in_activ' in options else 'identity'
+    in_W_init = options['in_W_init']
+    in_b_init = options['in_b_init']
+    in_nonlinearity = options['in_nonlinearity']
 
     # RNNs layers
-    encoder = options['encoder']
     dim_proj = options['dim_proj']
     pwidth = options['pwidth']
     pheight = options['pheight']
-    rnn_init = options['rnn_init']
-    rnn_activation = options['rnn_activation']
     stack_sublayers = options['stack_sublayers']
-    clip_grad_threshold = options['clip_grad_threshold']
+    RecurrentNet = options['RecurrentNet']
+    nonlinearity = options['nonlinearity']
+    hid_init = options['hid_init']
+    grad_clipping = options['grad_clipping']
+    precompute_input = options['precompute_input']
+    mask_input = options['mask_input']
+
+    # GRU specific params
+    gru_resetgate = options['gru_resetgate']
+    gru_updategate = options['gru_updategate']
+    gru_hidden_update = options['gru_hidden_update']
+    gru_hid_init = options['gru_hid_init']
+
+    # LSTM specific params
+    lstm_ingate = options['lstm_ingate']
+    lstm_forgetgate = options['lstm_forgetgate']
+    lstm_cell = options['lstm_cell']
+    lstm_outgate = options['lstm_outgate']
+
+    # RNN specific params
+    rnn_W_in_to_hid = options['rnn_W_in_to_hid']
+    rnn_W_hid_to_hid = options['rnn_W_hid_to_hid']
+    rnn_b = options['rnn_b']
 
     # Output upsampling layers
     out_upsampling = options['out_upsampling']
     out_nfilters = options['out_nfilters']
     out_filters_size = options['out_filters_size']
     out_filters_stride = options['out_filters_stride']
-    out_init = options['out_init']
-    out_activ = options['out_activ']
+    out_W_init = options['out_W_init']
+    out_b_init = options['out_b_init']
+    out_nonlinearity = options['out_nonlinearity']
 
     # Prediction, Softmax
     intermediate_pred = options['intermediate_pred']
@@ -503,13 +610,43 @@ def train(saveto='model.npz',
     # Build the model
     out_layer, f_pred = buildReSeg(input_shape, input_var,
                                    n_layers, pheight, pwidth,
-                                   dim_proj, nclasses,
-                                   stack_sublayers, out_upsampling,
-                                   out_nfilters, out_filters_size,
+                                   dim_proj, nclasses, stack_sublayers,
+                                   # upsampling
+                                   out_upsampling,
+                                   out_nfilters,
+                                   out_filters_size,
                                    out_filters_stride,
+                                   out_W_init=out_W_init,
+                                   out_b_init=out_b_init,
+                                   out_nonlinearity=out_nonlinearity,
+                                   # input ConvLayers
                                    in_nfilters=in_nfilters,
                                    in_filters_size=in_filters_size,
-                                   in_filters_stride=in_filters_stride)
+                                   in_filters_stride=in_filters_stride,
+                                   in_W_init=in_W_init,
+                                   in_b_init=in_b_init,
+                                   in_nonlinearity=in_nonlinearity,
+                                   # common recurrent layer params
+                                   RecurrentNet=RecurrentNet,
+                                   nonlinearity=nonlinearity,
+                                   hid_init=hid_init,
+                                   grad_clipping=grad_clipping,
+                                   precompute_input=precompute_input,
+                                   mask_input=mask_input,
+                                   # GRU specific params
+                                   gru_resetgate=gru_resetgate,
+                                   gru_updategate=gru_updategate,
+                                   gru_hidden_update=gru_hidden_update,
+                                   gru_hid_init=gru_hid_init,
+                                   # LSTM specific params
+                                   lstm_ingate=lstm_ingate,
+                                   lstm_forgetgate=lstm_forgetgate,
+                                   lstm_cell=lstm_cell,
+                                   lstm_outgate=lstm_outgate,
+                                   # RNN specific params
+                                   rnn_W_in_to_hid=rnn_W_in_to_hid,
+                                   rnn_W_hid_to_hid=rnn_W_hid_to_hid,
+                                   rnn_b=rnn_b)
     f_train = buildTrain(input_var, target_var, weights_loss, out_layer,
                          weight_decay)
 
@@ -571,7 +708,8 @@ def train(saveto='model.npz',
                 targets = targets[:, dh/2:(-dh+dh/2 if -dh+dh/2 else None),
                             dw/2:(-dw+dw/2 if -dw/dw/2 else None), ...]
 
-            print 'Image size: {}'.format(inputs.shape)
+            if np.mod(uidx, dispFreq) == 0:
+                print 'Image size: {}'.format(inputs.shape)
 
             # TODO: preprocess function
             # whiten, LCN, GCN, Local Mean Subtract, or normalize +
