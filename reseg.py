@@ -704,9 +704,9 @@ def train(saveto='model.npz',
                 dh = inputs.shape[1] % np.prod(options['pheight'])
                 dw = inputs.shape[2] % np.prod(options['pwidth'])
                 inputs = inputs[:, dh/2:(-dh+dh/2 if -dh+dh/2 else None),
-                           dw/2:(-dw+dw/2 if -dw/dw/2 else None), ...]
+                                dw/2:(-dw+dw/2 if -dw/dw/2 else None), ...]
                 targets = targets[:, dh/2:(-dh+dh/2 if -dh+dh/2 else None),
-                            dw/2:(-dw+dw/2 if -dw/dw/2 else None), ...]
+                                  dw/2:(-dw+dw/2 if -dw/dw/2 else None), ...]
 
             if np.mod(uidx, dispFreq) == 0:
                 print 'Image size: {}'.format(inputs.shape)
