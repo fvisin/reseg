@@ -860,8 +860,7 @@ class DeconvLayer(lasagne.layers.Layer):
 
     def __init__(self, incoming, num_filters, filter_size, stride=(2, 2),
                  pad=0, untie_biases=False, W=lasagne.init.GlorotUniform(),
-                 b=lasagne.init.Constant(0.),
-                 nonlinearity=lasagne.nonlinearities.rectify,
+                 b=lasagne.init.Constant(0.), nonlinearity=None,
                  flip_filters=False, **kwargs):
         super(DeconvLayer, self).__init__(incoming, **kwargs)
         if nonlinearity is None:
