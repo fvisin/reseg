@@ -743,9 +743,7 @@ def train(saveto='model.npz',
                 print('Epoch {}, Update {}, Cost {}, DD {}, UD {}').format(
                         eidx, uidx, round(cost, 5), round(dd), round(ud))
 
-            # Check predictions' accuracy
-            if eidx == max_epochs - 1 or np.mod(uidx, validFreq) == 0:
-
+            def validate_model():
                 # NOTE : No need to suppress any stochastic layer such as
                 # Dropout, since f_pred exclude any non-deterministic layer
                 (train_global_acc,
@@ -793,7 +791,6 @@ def train(saveto='model.npz',
                                                  folder_dataset='test',
                                                  dataset=dataset,
                                                  saveto=saveto[0])
-
                 print("")
                 print("Global Accuracies :")
                 print('Train ', train_global_acc,
@@ -835,6 +832,12 @@ def train(saveto='model.npz',
                 options['history_acc'] = np.array(history_acc)
                 options['history_conf_matrix'] = np.array(history_conf_matrix)
                 options['history_iou_index'] = np.array(history_iou_index)
+
+                return valid_global_acc
+
+            # Check predictions' accuracy
+            if np.mod(uidx, validFreq) == 0:
+                valid_global_acc = validate_model()
 
                 # Did we improve *validation* accuracy?
                 if len(history_acc) == 0 or valid_global_acc >= np.array(
@@ -886,6 +889,7 @@ def train(saveto='model.npz',
         print("Epoch {} of {} took {:.3f}s".format(
             eidx + 1, max_epochs, time.time() - start_time))
 
+    validate_model()
     max_valid_idx = np.argmax(np.array(history_acc)[:, 3])
     best = history_acc[max_valid_idx]
     best = (round(best[0], 5), round(best[3], 5), round(best[6], 5),
