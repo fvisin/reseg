@@ -1,3 +1,4 @@
 *.pyc
 segmentations
 *_models/
+tmp
