@@ -18,10 +18,11 @@ from helper_dataset import zero_pad, \
     compare_mask_image_filenames, convert_RGB_mask_to_index, \
     rgb2illumination_invariant, save_image
 
-
 N_DEBUG = -5
 DEBUG_SAVE_IMG = False
 DEBUG_SAVE_MASK = False
+
+intX = 'uint8'
 
 
 def properties():
@@ -59,11 +60,14 @@ def load_images(img_path, gt_path, colors, load_greylevel_mask=False,
 
         assert np.amax(im) <= 255, "Image is not 8-bit"
         if resize_images and resize_size != -1:
-            # it's already normalized btw 0-1 by the resize function
+
             w, h = resize_size
             im = resize(im, (h, w), order=3)
-        else:
-            im = np.array(img_as_float(im))
+            # order=3 : bicubic interpolation
+            # it's normalized by default btw 0-1 by the resize function
+            # so we want to preserve the range
+            im = img_as_ubyte(im)
+        im = im.astype(intX)
 
         if color_space == "HSV":
             im = rgb2hsv(im)
@@ -99,7 +103,7 @@ def load_images(img_path, gt_path, colors, load_greylevel_mask=False,
                 outpath = inpath.replace("gt", "gt_grey")
                 save_image(outpath, mask)
 
-        mask = np.array(mask).astype(np.int32)
+        mask = np.array(mask).astype(intX)
 
         if DEBUG_SAVE_MASK:
             outpath = inpath.replace('gt', 'debug_gt')
@@ -273,21 +277,23 @@ def load_dataset_camvid_segnet(path):
 
 
 def load_data(
-        path=os.path.expanduser('~/exp/datasets/camvid/'),
-        randomize=False,
-        resize_images=True,
-        resize_size=[480, 360],  # w x h : 960x720, 480x360, 320x240
-        color=False,
-        color_space='RGB',
-        normalize=False,
-        classes='subset_11',  # subset_11 , all
-        version='segnet',  # standard, segnet
-        split=[.44, .22],
-        with_filenames=False,
-        load_greylevel_mask=False,
-        save=False,
-        compute_stats='all',
-        rng=None):
+    path=os.path.expanduser('~/exp/datasets/camvid/'),
+    randomize=False,
+    resize_images=True,
+    resize_size=[320, 240],  # w x h : 960x720, 480x360, 320x240
+    color=False,
+    color_space='RGB',
+    normalize=False,
+    classes='subset_11',  # subset_11 , all
+    version='segnet',  # standard, segnet
+    split=[.44, .22],
+    with_filenames=False,
+    load_greylevel_mask=False,
+    save=False,
+    compute_stats='all',
+    rng=None,
+    with_fullmasks=False
+):
     """Dataset loader
 
     Parameter
@@ -404,11 +410,14 @@ def load_data(
     print (test_set_y[0].dtype)
     print (valid_set_y[0].dtype)
     """
-    if with_filenames:
-        return train, valid, test, mean, std, filenames
-    else:
-        return train, valid, test, mean, std
 
+    out_list = [train, valid, test, mean, std]
+    if with_filenames:
+        out_list.append(filenames)
+    if with_fullmasks:
+        out_list.append([])
+
+    return out_list
 
 if __name__ == '__main__':
     load_data(save=False)

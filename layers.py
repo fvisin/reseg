@@ -1,81 +1,11 @@
+import collections
 import numpy as np
-import theano
 import theano.tensor as T
 import lasagne
 from lasagne.layers import get_output_shape
 from theano.sandbox.cuda.dnn import dnn_conv
 from theano.sandbox.cuda.dnn import GpuDnnConvDesc, GpuDnnConvGradI
 from theano.sandbox.cuda.basic_ops import gpu_contiguous, gpu_alloc_empty
-
-
-def buildReSeg(input_shape, n_layers, pheight, pwidth, dim_proj, nclasses,
-               stack_sublayers, out_upsampling, out_nfilters, out_filters_size,
-               out_filters_stride):
-    '''Helper function to build a ReSeg network
-
-    '''
-    input_var = T.tensor4('inputs')
-    target_var = T.ivector('targets')
-    weights_loss = T.scalar('weights_loss')
-
-    # Tag test values
-    input_var.tag.test_value = np.random.random(
-        input_shape).astype('float32')
-    target_var.tag.test_value = np.random.random(
-        list(input_shape[:3]) + [nclasses]).astype('float32')
-    # theano.config.compute_test_value = 'warn'
-
-    # The ReSeg layer
-    print('Input shape: ' + str(input_shape))
-    l_in = lasagne.layers.InputLayer(shape=input_shape,
-                                     input_var=input_var,
-                                     name="input_layer")
-
-    l_reseg = ReSegLayer(l_in, n_layers, pheight, pwidth, dim_proj,
-                         nclasses, stack_sublayers, out_upsampling,
-                         out_nfilters, out_filters_size,
-                         out_filters_stride, 'reseg')
-    # Reshape in 2D, last dimension is nclasses, where the softmax is applied
-    l_out = lasagne.layers.ReshapeLayer(
-        l_reseg,
-        (T.prod(l_reseg.output_shape[0:3]), l_reseg.output_shape[3]),
-        name='reshape_before_softmax')
-
-    l_pred = lasagne.layers.NonlinearityLayer(
-        l_out,
-        nonlinearity=lasagne.nonlinearities.softmax,
-        name="softmax_layer")
-
-    # Create a loss expression for training, i.e., a scalar objective we want
-    # to minimize (for our multi-class problem, it is the cross-entropy loss):
-    prediction = lasagne.layers.get_output(l_pred)
-
-    loss = lasagne.objectives.categorical_crossentropy(
-        prediction, target_var)
-    loss = weights_loss * loss.mean()
-
-    # TODO We could add some weight decay as well here,
-    # see lasagne.regularization.
-
-    params = lasagne.layers.get_all_params(l_pred, trainable=True)
-    # Stochastic Gradient Descent (SGD) with Nesterov momentum
-    # updates = lasagne.updates.nesterov_momentum(
-    #         loss, params, learning_rate=LEARNING_RATE, momentum=0.9)
-    updates = lasagne.updates.adadelta(loss, params)
-
-    # Compile the function that gives back the mask prediction
-    prediction = lasagne.layers.get_output(l_pred, deterministic=True)
-    f_pred = theano.function(
-        [input_var],
-        T.argmax(prediction, axis=1).reshape(input_shape[:3]))
-
-    # Compile the function that performs a training step on a mini-batch
-    # (by using the updates dictionary) and returns the corresponding training
-    # loss:
-    f_train = theano.function([input_var, target_var, weights_loss], loss,
-                              updates=updates)
-
-    return l_out, f_pred, f_train
 
 
 class ReSegLayer(lasagne.layers.Layer):
@@ -95,6 +25,13 @@ class ReSegLayer(lasagne.layers.Layer):
                  out_W_init=lasagne.init.GlorotUniform(),
                  out_b_init=lasagne.init.Constant(0.),
                  out_nonlinearity=lasagne.nonlinearities.rectify,
+                 # input ConvLayers
+                 in_nfilters=None,
+                 in_filters_size=((3, 3), (3, 3)),
+                 in_filters_stride=((1, 1), (1, 1)),
+                 in_W_init=lasagne.init.GlorotUniform(),
+                 in_b_init=lasagne.init.Constant(0.),
+                 in_nonlinearity=lasagne.nonlinearities.rectify,
                  # common recurrent layer params
                  RecurrentNet=lasagne.layers.GRULayer,
                  nonlinearity=lasagne.nonlinearities.rectify,
@@ -222,7 +159,48 @@ class ReSegLayer(lasagne.layers.Layer):
 
         (batch_size, cheight, cwidth, cchannels) = get_output_shape(l_in)
 
-        # TODO insert input conv layers
+        # Input ConvLayers
+        if isinstance(in_nfilters, collections.Iterable):
+            # the input layer of the Conv2DLayer should be in bc01 format
+            l_in_conv = lasagne.layers.DimshuffleLayer(
+                l_in,
+                (0, 3, 1, 2),
+                name=self.name + "_input_conv_dimshuffle")
+
+            for i, (nf, f_size, stride) in enumerate(
+                    zip(in_nfilters, in_filters_size, in_filters_stride)):
+
+                # TODO: not sure that this is true..
+                # abstract2DConv is working or not?
+
+                # Conv2DLayer will create a convolutional layer using
+                # T.nnet.conv2d, Theano's default convolution.
+                # On compilation for GPU, Theano replaces this with a
+                # cuDNN-based implementation if available,
+                # otherwise falls back to a gemm-based implementation
+
+                # pad='valid' -> out_size = (input_size - f_size + 1) / stride
+                l_in_conv = lasagne.layers.Conv2DLayer(
+                    l_in_conv,
+                    num_filters=nf,
+                    filter_size=f_size,
+                    stride=stride,
+                    W=in_W_init,
+                    b=in_b_init,
+                    pad='valid',
+                    name=self.name + '_input_conv_layer' + str(i)
+                )
+                out_shape = get_output_shape(l_in_conv)
+                out_shape = (out_shape[0], out_shape[2],
+                             out_shape[3], out_shape[1])
+
+                print('RecSeg: After in-convnet: {}'.format(out_shape))
+
+            # invert the dimshuffle before input convolution
+            l_in = lasagne.layers.DimshuffleLayer(
+                l_in_conv,
+                (0, 2, 3, 1),
+                name=self.name + "_input_conv_undimshuffle")
 
         # ReNet layers
         l_renet = l_in
@@ -261,28 +239,38 @@ class ReSegLayer(lasagne.layers.Layer):
                 n_rnns, pheight[lidx], pwidth[lidx], dim_proj[lidx],
                 out_shape))
 
-        # UPSAMPLING
+        # Upsampling
         if out_upsampling_type == 'grad':
             # We use a custom Deconv layer: UpsampleConv2DDNNLayer
             # the input has to be in the 'bc01' shape
-            l_renet_out = lasagne.layers.dimshuffle(l_renet,
-                                                    (0, 3, 1, 2))
+            l_renet_out = lasagne.layers.DimshuffleLayer(
+                l_renet,
+                (0, 3, 1, 2),
+                name=self.name + '_grad_dimshuffle')
 
-            for i, (num_filters, filter_size, filter_stride) in enumerate(zip(
+            for i, (nf, f_size, stride) in enumerate(zip(
                     out_nfilters, out_filters_size, out_filters_stride)):
                 renet_layer_out = UpsampleConv2DDNNLayer(
-                        l_renet_out,
-                        num_filters=num_filters,
-                        filter_size=filter_size,
-                        stride=filter_stride,
-                        # pad='same',
-                        # untie_biases=False,
-                        W=out_W_init,
-                        b=out_b_init,
-                        nonlinearity=out_nonlinearity)
+                    l_renet_out,
+                    num_filters=nf,
+                    filter_size=f_size,
+                    stride=stride,
+                    # pad='same',
+                    # untie_biases=False,
+                    W=out_W_init,
+                    b=out_b_init,
+                    nonlinearity=out_nonlinearity)
+                out_shape = get_output_shape(renet_layer_out)
+                out_shape = (out_shape[0], out_shape[2],
+                             out_shape[3], out_shape[1])
 
-            l_out = lasagne.layers.DimshuffleLayer(renet_layer_out,
-                                                   (0, 2, 3, 1))
+                print('Upsample: After grad @ nf: {}, fs: {}, str: {} : {}'.
+                      format(nf, f_size, stride, out_shape))
+
+            l_out = lasagne.layers.DimshuffleLayer(
+                renet_layer_out,
+                (0, 2, 3, 1),
+                name=self.name + '_grad_undimshuffle')
 
         elif out_upsampling_type == 'linear':
             expand_height = np.prod(pheight)
@@ -657,7 +645,8 @@ class BidirectionalRNNLayer(lasagne.layers.Layer):
             A recurrent layer class
         nonlinearity : callable or None
             The nonlinearity that is applied to the output. If
-            None is provided, no nonlinearity will be applied.
+            None is provided, no nonlinearity will be applied. Only for
+            LSTMLayer and RecurrentLayer
         hid_init : callable, np.ndarray, theano.shared or
                    lasagne.layers.Layer
             Initializer for initial hidden state
@@ -723,6 +712,7 @@ class BidirectionalRNNLayer(lasagne.layers.Layer):
         # LSTM
         elif RecurrentNet.__name__ == 'LSTMLayer':
             rnn_params = dict(
+                nonlinearity=nonlinearity,
                 ingate=lstm_ingate,
                 forgetgate=lstm_forgetgate,
                 cell=lstm_cell,
@@ -731,6 +721,7 @@ class BidirectionalRNNLayer(lasagne.layers.Layer):
         # RNN
         elif RecurrentNet.__name__ == 'RecurrentLayer':
             rnn_params = dict(
+                nonlinearity=nonlinearity,
                 W_in_to_hid=rnn_W_in_to_hid,
                 W_hid_to_hid=rnn_W_hid_to_hid,
                 b=rnn_b)
@@ -738,7 +729,6 @@ class BidirectionalRNNLayer(lasagne.layers.Layer):
             raise NotImplementedError('RecurrentNet not implemented')
 
         common_params = dict(
-            nonlinearity=nonlinearity,
             hid_init=hid_init,
             grad_clipping=grad_clipping,
             precompute_input=precompute_input,
@@ -936,23 +926,14 @@ class DeconvLayer(lasagne.layers.Layer):
 
         filters = gpu_contiguous(self.W)
         state_below = gpu_contiguous(input)
-        out_shape = T.stack(self.output_shape)
+        out_shape = T.as_tensor_variable(self.output_shape)
 
         desc = GpuDnnConvDesc(border_mode=self.pad,
                               subsample=self.stride,
-                              conv_mode=conv_mode)(out_shape, filters.shape)
+                              conv_mode=conv_mode)(out_shape,
+                                                   filters.shape)
         grad = GpuDnnConvGradI()(filters, state_below,
                                  gpu_alloc_empty(*out_shape), desc)
-
-        # image = T.alloc(0., *self.output_shape)
-        # conved = dnn_conv(img=image,
-        #                   kerns=self.W,
-        #                   subsample=self.stride,
-        #                   border_mode=self.pad,
-        #                   conv_mode=conv_mode
-        #                   )
-        #
-        # grad = T.grad(conved.sum(), wrt=image, known_grads={conved: input})
 
         if self.b is None:
             activation = grad
