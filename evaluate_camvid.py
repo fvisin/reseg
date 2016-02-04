@@ -68,7 +68,12 @@ def main(job_id, params):
 
         # Optimization method
         optimizer=params['optimizer'],
-        lrate=params['lrate'],
+        learning_rate=params['learning-rate'],
+        momentum=params['momentum'],
+        rho=params['rho'],
+        beta1=params['beta1'],
+        beta2=params['beta2'],
+        epsilon=params['epsilon'],
         weight_decay=params['weight-decay'],
         weight_noise=params['weight-noise'],
 
@@ -189,8 +194,13 @@ if __name__ == '__main__':
         'dropout-x-rate': 0.8,
 
         # Optimization method
-        'optimizer': 'adadelta',
-        'lrate': 0.01,
+        'optimizer': lasagne.updates.adadelta,
+        'learning-rate': None,
+        'momentum': None,
+        'rho': None,
+        'beta1': None,
+        'beta2': None,
+        'epsilon': None,
         'weight-decay': 0.,  # l2 reg
         'weight-noise': 0.,
 

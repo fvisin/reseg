@@ -5,6 +5,7 @@ import os
 import sys
 import collections
 from tabulate import tabulate
+import lasagne
 
 from config_datasets import headers_datasets
 
@@ -66,12 +67,13 @@ def print_params(fp, print_commit_hash=False, plot=False,
     else:
         huc = None
 
+    fp['optimizer'] = lasagne.updates.adadelta
     print("{0}|{1}|{2}|{3}|{4}|{5}|{6}|{7}|{8}|{9}|{10}|{11}|{12}|{13}|"
           "{14}|{15}|{16}|{17}|{18}|{19}|{20}|{21}|{22}|{23}|{24}|{25}|"
           "{26}|{27}|{28}|{29}|{30}|{31}|{32}|{33}|{34}|{35}|{36}|{37}|"
           "{38}|{39}|{40}|{41}|{42}|{43}|{44}|{45}|{46}|{47}|{48}|{49}|"
           "{50}|{51}|{52}|{53}|{54}|{55}|{56}|{57}|{58}|{59}|{60}|{61}|"
-          "{62}|{63}|{64}|{65}|{66}|").format(
+          "{62}|{63}|{64}|{65}|{66}|{67}|{68}|{69}|{70}|").format(
         # Input Conv layers
         fp['in_nfilters'],
         fp['in_filters_size'] if isinstance(fp['in_nfilters'],
@@ -160,17 +162,21 @@ def print_params(fp, print_commit_hash=False, plot=False,
         # 34 -> 38
 
         # Optimization method
-        fp['optimizer'],
-        fp['lrate'],
+        fp['optimizer'].__name__,
+        fp.get('learning_rate', ' '),
+        fp.get('momentum', ' '),
+        fp.get('beta1', ' '),
+        fp.get('beta2', ' '),
+        fp.get('epsilon', ' '),
         fp['weight_decay'],
         fp['weight_noise'],
-        # 39 -> 42
+        # 39 -> 47
 
         # Early stopping
         fp['patience'],
         fp['max_epochs'],
         fp['min_epochs'],
-        # 43 -> 45
+        # 48 -> 50
 
         # Save, display fp
         # fp['dispFreq'],
@@ -182,7 +188,7 @@ def print_params(fp, print_commit_hash=False, plot=False,
         fp['batch_size'],
         fp['valid_batch_size'],
         fp['shuffle'],
-        # 46 -> 48
+        # 51 -> 53
 
         # Dataset
         fp['dataset'],
@@ -190,7 +196,7 @@ def print_params(fp, print_commit_hash=False, plot=False,
         fp['color'],
         fp['resize_images'],
         fp['resize_size'],
-        # 49 -> 53
+        # 54 -> 58
 
         # Pre_processing
         fp['preprocess_type'],
@@ -199,7 +205,7 @@ def print_params(fp, print_commit_hash=False, plot=False,
                                                        'subdiv-lcn',
                                                        'local_mean_sub')
         else ' ',
-        # 54 -> 56
+        # 59 -> 60
 
         # Data augmentation
         fp['do_random_flip'],
@@ -212,7 +218,7 @@ def print_params(fp, print_commit_hash=False, plot=False,
         error[2],
         error[3],
         error[4]
-        # 57 -> 66
+        # 61 -> 70
     )
 
     if len(best_test_class_acc) > 0:

@@ -18,7 +18,7 @@ from helper_dataset import zero_pad, \
     compare_mask_image_filenames, convert_RGB_mask_to_index, \
     rgb2illumination_invariant, save_image
 
-N_DEBUG = -5
+N_DEBUG = 5
 DEBUG_SAVE_IMG = False
 DEBUG_SAVE_MASK = False
 

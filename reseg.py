@@ -197,7 +197,9 @@ def buildReSeg(input_shape, input_var,
 
 
 def getFunctions(input_var, target_var, class_balance_w_var, l_pred,
-                 weight_decay=0.):
+                 weight_decay=0., optimizer=lasagne.updates.adadelta,
+                 learning_rate=None, momentum=None,
+                 rho=None, beta1=None, beta2=None, epsilon=None, ):
     '''Helper function to build the training function
 
     '''
@@ -223,10 +225,57 @@ def getFunctions(input_var, target_var, class_balance_w_var, l_pred,
         loss += l2_penalty * weight_decay
 
     params = lasagne.layers.get_all_params(l_pred, trainable=True)
-    # Stochastic Gradient Descent (SGD) with Nesterov momentum
-    updates = lasagne.updates.nesterov_momentum(
-            loss, params, learning_rate=0.00001, momentum=0.9)
-    # updates = lasagne.updates.adadelta(loss, params)
+
+    opt_params = dict()
+
+    if optimizer.__name__ == 'sgd':
+        if learning_rate is None:
+            raise TypeError("Learning rate can't be 'None' with SGD")
+        opt_params = dict(learning_rate=learning_rate)
+
+    elif (optimizer.__name__ == 'momentum' or
+          optimizer.__name__ == 'nesterov_momentum'):
+        if learning_rate is None:
+            raise TypeError("Learning rate can't be 'None' "
+                            "with Momentum SGD or Nesterov Momentum")
+        opt_params = dict(
+            learning_rate=learning_rate,
+            momentum=momentum
+        )
+
+    elif optimizer.__name__ == 'adagrad':
+
+        if learning_rate is not None:
+            opt_params.update(dict(learning_rate=learning_rate))
+        if epsilon is not None:
+            opt_params.update(dict(epsilon=epsilon))
+
+    elif (optimizer.__name__ == 'rmsprop' or
+          optimizer.__name__ == 'adadelta'):
+
+        if learning_rate is not None:
+            opt_params.update(dict(learning_rate=learning_rate))
+        if rho is not None:
+            opt_params.update(dict(rho=rho))
+        if epsilon is not None:
+            opt_params.update(dict(epsilon=epsilon))
+
+    elif (optimizer.__name__ == 'adam' or
+          optimizer.__name__ == 'adamax'):
+
+        if learning_rate is not None:
+            opt_params.update(dict(learning_rate=learning_rate))
+        if beta1 is not None:
+            opt_params.update(dict(beta1=beta1))
+        if beta2 is not None:
+            opt_params.update(dict(beta2=beta2))
+        if epsilon is not None:
+            opt_params.update(dict(epsilon=epsilon))
+
+    else:
+        raise NotImplementedError('Optimization method not implemented')
+
+    updates = optimizer(loss, params, **opt_params)
 
     # Training function:
     # computes the training loss (with stochasticity, if any) and
@@ -303,8 +352,13 @@ def train(saveto='model.npz',
           dropout_x_rate=0.8,
 
           # Optimization method
-          optimizer='adadelta',
-          lrate=0.01,
+          optimizer=lasagne.updates.adadelta,
+          learning_rate=None,
+          momentum=None,
+          rho=None,
+          beta1=None,
+          beta2=None,
+          epsilon=None,
           weight_decay=0.,  # l2 reg
           weight_noise=0.,
 
@@ -469,7 +523,12 @@ def train(saveto='model.npz',
 
     # Optimization method
     optimizer = options['optimizer']
-    lrate = options['lrate']
+    learning_rate = options['learning_rate']
+    momentum = options['momentum']
+    rho = options['rho']
+    beta1 = options['beta1']
+    beta2 = options['beta2']
+    epsilon = options['epsilon']
     weight_decay = options['weight_decay']
     weight_noise = options['weight_noise']
 
@@ -664,8 +723,10 @@ def train(saveto='model.npz',
                        rnn_W_in_to_hid=rnn_W_in_to_hid,
                        rnn_W_hid_to_hid=rnn_W_hid_to_hid,
                        rnn_b=rnn_b)
-    f_pred, f_train = getFunctions(input_var, target_var, class_balance_w_var,
-                                   l_out, weight_decay)
+    f_pred, f_train = getFunctions(
+        input_var, target_var, class_balance_w_var, l_out, weight_decay,
+        optimizer=optimizer, learning_rate=learning_rate, momentum=momentum,
+        rho=rho, beta1=beta1, beta2=beta2, epsilon=epsilon)
 
     # Reload the list of the value parameters
     # TODO Check if the saved params are CudaNDArrays or not, so that we
