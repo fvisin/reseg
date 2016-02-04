@@ -6,20 +6,35 @@
 # Download pretrained weights from:
 # https://s3.amazonaws.com/lasagne/recipes/pretrained/imagenet/vgg16.pkl
 
+from collections import OrderedDict
+import numpy
+try:
+    import cPickle as pickle
+except:
+    import pickle
+
+import lasagne
+import lasagne.layers
 from lasagne.layers import InputLayer, DenseLayer, NonlinearityLayer
-# from lasagne.layers.dnn import Conv2DDNNLayer as ConvLayer
-# from lasagne.layers import Pool2DLayer as PoolLayer
-from padded import PaddedConv2DLayer as ConvLayer
-from padded import PaddedPool2DLayer as PoolLayer
+from padded import PaddedConv2DLayer
+from padded import PaddedPool2DLayer
 from lasagne.nonlinearities import softmax
 
 
-def build_model(l_in=InputLayer((None, 3, 224, 224)), trainable=True,
-                regularizable=True):
-    net = {}
+def build_model(l_in=InputLayer((None, 3, 224, 224)), get_layer='prob',
+                padded=True, trainable=True, regularizable=True):
+    if padded:
+        ConvLayer = PaddedConv2DLayer
+        PoolLayer = PaddedPool2DLayer
+    else:
+        ConvLayer = lasagne.layers.dnn.Conv2DDNNLayer
+        PoolLayer = lasagne.layers.Pool2DLayer
+
+    net = OrderedDict()
     net['input'] = l_in
+    net['bgr'] = RGBtoBGRLayer(net['input'])
     net['conv1_1'] = ConvLayer(
-        net['input'], 64, 3, pad=1, flip_filters=False)
+        net['bgr'], 64, 3, pad=1, flip_filters=False)
     net['conv1_2'] = ConvLayer(
         net['conv1_1'], 64, 3, pad=1, flip_filters=False)
     net['pool1'] = PoolLayer(
@@ -53,14 +68,32 @@ def build_model(l_in=InputLayer((None, 3, 224, 224)), trainable=True,
     net['conv5_3'] = ConvLayer(
         net['conv5_2'], 512, 3, pad=1, flip_filters=False)
     net['pool5'] = PoolLayer(net['conv5_3'], 2)
-    net['fc6'] = DenseLayer(net['pool5'], num_units=4096)
-    net['fc7'] = DenseLayer(net['fc6'], num_units=4096)
-    net['fc8'] = DenseLayer(net['fc7'], num_units=1000, nonlinearity=None)
-    net['prob'] = NonlinearityLayer(net['fc8'], softmax)
+
+    if 'fc' in get_layer or get_layer == 'prob':
+        net['fc6'] = DenseLayer(net['pool5'], num_units=4096)
+        net['fc7'] = DenseLayer(net['fc6'], num_units=4096)
+        net['fc8'] = DenseLayer(net['fc7'], num_units=1000, nonlinearity=None)
+        net['prob'] = NonlinearityLayer(net['fc8'], softmax)
+
+    reached = False
+    # Collect garbage
+    for el in net.iteritems():
+        if reached:
+            del(net[el[0]])
+        if el[0] == get_layer:
+            reached = True
 
     # Set names to layers
     for name in net.keys():
         net[name].name = 'vgg16_' + name
+    net = net[get_layer]
+
+    # Reload weights
+    nparams = len(lasagne.layers.get_all_params(net))
+    with open('w_vgg16.pkl', 'rb') as f:
+        # Note: in python3 use the pickle.load parameter `encoding='latin-1'`
+        vgg16_w = pickle.load(f)['param values']
+    lasagne.layers.set_all_param_values(net, vgg16_w[:nparams])
 
     # Do not train or regularize vgg
     if not trainable or not regularizable:
@@ -80,3 +113,30 @@ def build_model(l_in=InputLayer((None, 3, 224, 224)), trainable=True,
                         pass
 
     return net
+
+
+class RGBtoBGRLayer(lasagne.layers.Layer):
+    def __init__(self, l_in, bgr_mean=numpy.array([103.939, 116.779, 123.68]),
+                 **kwargs):
+        """A Layer to convert images from RGB to BGR
+
+        This layer converts images from RGB to BGR to adapt to Caffe
+        taht uses OpenCV, which uses BGR
+
+        Parameters
+        ----------
+        l_in : :class:``lasagne.layers.Layer``
+            The incoming layer, typically an
+            :class:``lasagne.layers.InputLayer``
+        bgr_mean : iterable of 3 ints
+            The mean of each channel. By default, the ImageNet
+            mean values are used.
+        """
+        super(RGBtoBGRLayer, self).__init__(l_in, **kwargs)
+        self.l_in = l_in
+
+    def get_output_for(self, input_im, **kwargs):
+        # input_im is (bs, channels, height, width), values are 0-255
+        input_im = input_im[:, ::-1]  # switch to BGR
+        input_im -= self.bgr_mean
+        return input_im

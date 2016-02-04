@@ -1,6 +1,5 @@
 # Standard library imports
 import cPickle as pkl
-import pickle
 import collections
 import matplotlib.pyplot as plt
 import os
@@ -105,12 +104,6 @@ def buildReSeg(input_shape, input_var,
         # Convert to batchsize, ch, rows, cols
         l_in = lasagne.layers.DimshuffleLayer(l_in, (0, 3, 1, 2))
         l_vgg16 = buildVgg16(l_in, False, False)['conv4_3']
-
-        # Reload weights
-        nparams = len(lasagne.layers.get_all_params(l_vgg16))
-        vgg16_w = pickle.load(open('vgg16.pkl'))
-        lasagne.layers.set_all_param_values(l_vgg16,
-                                            vgg16_w['param values'][:nparams])
         # Back to batchsize, rows, cols, ch
         l_in = lasagne.layers.DimshuffleLayer(l_vgg16, (0, 2, 3, 1))
 
