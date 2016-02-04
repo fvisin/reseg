@@ -108,7 +108,7 @@ def load_images(img_path, gt_path, colors, load_greylevel_mask=False,
         if DEBUG_SAVE_MASK:
             outpath = inpath.replace('gt', 'debug_gt')
             outpath = inpath.replace('annot', 'debug_annot')
-            print np.unique(mask)
+            # print np.unique(mask)
 
             save_image(outpath, label2rgb(mask, colors=colors_list['camvid']))
 
