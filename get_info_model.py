@@ -33,21 +33,24 @@ def print_params(fp, print_commit_hash=False, plot=False,
         If True, the error curves will be plotted
     """
     dataset = fp.get("dataset", "camvid")
-    headers = headers_datasets.get(dataset, None)
-    if dataset is None:
-        headers = [str(i) for i in range(0, fp['out_nfilters'][-1])]
 
     errs = numpy.array(fp['history_acc'])
     conf_matrices = numpy.array(fp['history_conf_matrix'])
     iou_indeces = numpy.array(fp['history_iou_index'])
+    nclasses = conf_matrices.shape[2] if len(conf_matrices) > 0 else -1
+    # hack for nyu because now I don't have the time to think to something else
+    if dataset == 'nyu_depth':
+        dataset = 'nyu_depth40' if nclasses == 41 else 'nyu_depth04'
+    headers = headers_datasets.get(dataset, None)
+    if headers is None:
+        headers = [str(i) for i in range(0, fp['out_nfilters'][-1])]
 
     # they're already accuracies
     if len(errs):
         min_valid = numpy.argmax(errs[:, 3])
         best = errs[min_valid]
-        best_test_class_acc = numpy.round(numpy.diagonal(conf_matrices[
-                                                                 min_valid][
-                                                                 2]), 3)
+        best_test_class_acc = numpy.round(numpy.diagonal(
+            conf_matrices[min_valid][2]), 3)
         best_test_iou_indeces = numpy.round(iou_indeces[min_valid][2], 3)
         if len(best) == 2:
             error = (" ", round(best[0], 6), round(best[3], 6))
@@ -329,18 +332,19 @@ def print_params(fp, print_commit_hash=False, plot=False,
 
             print(tabulate(class_acc, headers=headers))
 
-            numpy.set_printoptions(precision=3)
-            print ""
-            print('Train Confusion matrix')
-            print(tabulate(train_conf_matrix_norm, headers=headers))
-            print ""
-            print('Valid Confusion matrix')
-            print(tabulate(valid_conf_matrix_norm, headers=headers))
-
-            if len(test_conf_matrix_norm) > 0:
+            if dataset != "nyu_depth40":
+                numpy.set_printoptions(precision=3)
                 print ""
-                print('Test Confusion matrix')
-                print(tabulate(test_conf_matrix_norm, headers=headers))
+                print('Train Confusion matrix')
+                print(tabulate(train_conf_matrix_norm, headers=headers))
+                print ""
+                print('Valid Confusion matrix')
+                print(tabulate(valid_conf_matrix_norm, headers=headers))
+
+                if len(test_conf_matrix_norm) > 0:
+                    print ""
+                    print('Test Confusion matrix')
+                    print(tabulate(test_conf_matrix_norm, headers=headers))
 
     return 1
 

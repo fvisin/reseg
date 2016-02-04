@@ -1,8 +1,10 @@
+import os
 import numpy as np
 import matplotlib as mpl
 import matplotlib.pyplot as plt
 from collections import OrderedDict
 import matplotlib.cm as cm
+import scipy.io as sio
 
 
 # COLORMAPS
@@ -159,6 +161,49 @@ colormap_horses = OrderedDict([
 
 headers_horses = ["Horses", "Non-horses"]
 
+# ##### NYU DEPTH ##### #
+# 40 classes
+nclasses = 41
+color_bins = np.linspace(0, 1, nclasses)
+norm = mpl.colors.Normalize(vmin=0, vmax=1)
+m = cm.ScalarMappable(norm=norm, cmap=plt.get_cmap('Pastel2'))
+colormap_nyu_depth40 = m.to_rgba(color_bins)[:, :3]
+
+path_mapping = os.path.join(
+    os.path.expanduser('~/exp/datasets/nyu_depth_v2/'),
+    'eccv14-data',
+    'benchmarkData',
+    'metadata',
+    'classMapping40.mat'
+)
+
+f = sio.loadmat(path_mapping,
+                squeeze_me=True,
+                struct_as_record=False)
+headers_nyu_depth40 = np.append(
+    [ff.encode("utf-8") for ff in f['className']], "Void").tolist()
+
+
+# 4 Super Class
+nclasses = 5
+color_bins = np.linspace(0, 1, nclasses)
+norm = mpl.colors.Normalize(vmin=0, vmax=1)
+m = cm.ScalarMappable(norm=norm, cmap=plt.get_cmap('Pastel2'))
+colormap_nyu_depth04 = m.to_rgba(color_bins)[:, :3]
+
+path_mapping = os.path.join(
+    os.path.expanduser('~/exp/datasets/nyu_depth_v2/'),
+    'eccv14-data',
+    'benchmarkData',
+    'metadata',
+    'classMapping04.mat'
+)
+
+f = sio.loadmat(path_mapping,
+                squeeze_me=True,
+                struct_as_record=False)
+headers_nyu_depth04 = np.append(
+    [ff.encode("utf-8") for ff in f['className']], "Void").tolist()
 
 # DATASET DICTIONARIES #
 colormap_datasets = dict()
@@ -173,8 +218,13 @@ for key, value in colormap_datasets.iteritems():
     colormap_datasets[key] = np.asarray(
                     [z for z in zip(*value.items())[1]]) / 255.
 
+colormap_datasets.update({'nyu_depth04': colormap_nyu_depth04})
+colormap_datasets.update({'nyu_depth40': colormap_nyu_depth40})
+
 headers_datasets = dict()
 headers_datasets["camvid"] = headers_camvid
 headers_datasets["daimler"] = headers_daimler
 headers_datasets["kitti_road"] = headers_kitti_road
 headers_datasets["horses"] = headers_horses
+headers_datasets["nyu_depth04"] = headers_nyu_depth04
+headers_datasets["nyu_depth40"] = headers_nyu_depth40

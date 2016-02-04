@@ -104,6 +104,10 @@ def validate(f_pred,
         * Intersection Over Union Index
     """
     print >>sys.stderr, 'Prediction {}: '.format(folder_dataset),
+    # check if the dataset is empty
+    if len(data) == 0:
+        return 0., [], [], 0., [], 0.
+
 
     if samples_ids.size > 0:
         name = dataset
@@ -111,6 +115,10 @@ def validate(f_pred,
                                 saveto.split('/')[-1][:-4])
         # gt_path = os.path.join('gt', name, saveto.split('/')[-1][:-4])
         # img_path = os.path.join('img', name, saveto.split('/')[-1][:-4])
+
+        # hack for nyu because now I don't have the time to better think
+        if name == 'nyu_depth':
+            name = 'nyu_depth40' if nclasses == 41 else 'nyu_depth04'
         colormap = colormap_datasets[name]
 
     inputs, targets = data
