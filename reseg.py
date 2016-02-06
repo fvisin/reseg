@@ -601,8 +601,9 @@ def train(saveto='model.npz',
     # Compute the indexes of the images to be saved
     if isinstance(n_save, collections.Iterable):
         samples_ids = np.array(n_save)
-    elif isinstance(n_save, int):
-        n_save = min(n_save, len(train[0]), len(valid[0]), len(test[0]))
+    elif isinstance(n_save, int) and n_save > 0:
+        list_n = [len(s) for s in [train[0], valid[0], test[0]] if len(s) > 0]
+        n_save = min(n_save, *list_n)
         samples_ids = np.arange(n_save) if n_save != -1 else np.array([-1])
         rng.shuffle(samples_ids)
     options['samples_ids'] = samples_ids
