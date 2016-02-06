@@ -15,14 +15,16 @@ except:
 
 import lasagne
 import lasagne.layers
+import lasagne.layers.dnn
 from lasagne.layers import InputLayer, DenseLayer, NonlinearityLayer
+from lasagne.nonlinearities import softmax
 from padded import PaddedConv2DLayer
 from padded import PaddedPool2DLayer
-from lasagne.nonlinearities import softmax
+import theano
 
 
-def build_model(l_in=InputLayer((None, 3, 224, 224)), get_layer='prob',
-                padded=True, trainable=True, regularizable=True):
+def buildVgg16(l_in=InputLayer((None, 3, 224, 224)), get_layer='prob',
+               padded=True, trainable=False, regularizable=False):
     if padded:
         ConvLayer = PaddedConv2DLayer
         PoolLayer = PaddedPool2DLayer
@@ -86,14 +88,13 @@ def build_model(l_in=InputLayer((None, 3, 224, 224)), get_layer='prob',
     # Set names to layers
     for name in net.keys():
         net[name].name = 'vgg16_' + name
-    net = net[get_layer]
 
     # Reload weights
-    nparams = len(lasagne.layers.get_all_params(net))
+    nparams = len(lasagne.layers.get_all_params(net.values()))
     with open('w_vgg16.pkl', 'rb') as f:
         # Note: in python3 use the pickle.load parameter `encoding='latin-1'`
         vgg16_w = pickle.load(f)['param values']
-    lasagne.layers.set_all_param_values(net, vgg16_w[:nparams])
+    lasagne.layers.set_all_param_values(net.values(), vgg16_w[:nparams])
 
     # Do not train or regularize vgg
     if not trainable or not regularizable:
@@ -112,16 +113,17 @@ def build_model(l_in=InputLayer((None, 3, 224, 224)), get_layer='prob',
                     except KeyError:
                         pass
 
-    return net
+    return net[get_layer]
 
 
 class RGBtoBGRLayer(lasagne.layers.Layer):
     def __init__(self, l_in, bgr_mean=numpy.array([103.939, 116.779, 123.68]),
-                 **kwargs):
-        """A Layer to convert images from RGB to BGR
+                 data_format='bc01', **kwargs):
+        """A Layer to normalize and convert images from RGB to BGR
 
         This layer converts images from RGB to BGR to adapt to Caffe
-        taht uses OpenCV, which uses BGR
+        that uses OpenCV, which uses BGR. It also subtracts the
+        per-pixel mean.
 
         Parameters
         ----------
@@ -131,12 +133,22 @@ class RGBtoBGRLayer(lasagne.layers.Layer):
         bgr_mean : iterable of 3 ints
             The mean of each channel. By default, the ImageNet
             mean values are used.
+        data_format : str
+            The format of l_in, either `b01c` (batch, rows, cols,
+            channels) or `bc01` (batch, channels, rows, cols)
         """
         super(RGBtoBGRLayer, self).__init__(l_in, **kwargs)
+        assert data_format in ['bc01', 'b01c']
         self.l_in = l_in
+        floatX = theano.config.floatX
+        self.bgr_mean = bgr_mean.astype(floatX)
+        self.data_format = data_format
 
     def get_output_for(self, input_im, **kwargs):
-        # input_im is (bs, channels, height, width), values are 0-255
-        input_im = input_im[:, ::-1]  # switch to BGR
-        input_im -= self.bgr_mean
+        if self.data_format == 'bc01':
+            input_im = input_im[:, ::-1, :, :]
+            input_im -= self.bgr_mean[:, numpy.newaxis, numpy.newaxis]
+        else:
+            input_im = input_im[:, :, :, ::-1]
+            input_im -= self.bgr_mean
         return input_im
