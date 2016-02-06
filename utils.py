@@ -1,13 +1,16 @@
+from collections import OrderedDict
 import os
 import sys
+
+import numpy as np
+from retrying import retry
 from skimage import img_as_float
 from sklearn.metrics import confusion_matrix
 from skimage.color import label2rgb
 from skimage.io import imsave
-from config_datasets import color_list_datasets
-import numpy as np
 import theano
-from retrying import retry
+
+from config_datasets import color_list_datasets
 
 floatX = theano.config.floatX
 
@@ -200,6 +203,7 @@ def validate(f_pred,
             cm_normalized, mean_class_acc,
             iou_index, mean_iou_index)
 
+
 def zipp(vparams, params):
     """Copy values from one dictionary to another.
 
@@ -278,3 +282,43 @@ def retry_if_io_error(exception):
        retry_on_exception=retry_if_io_error)
 def save_with_retry(saveto, args):
     np.savez(saveto, *args)
+
+
+def ceildiv(a, b):
+    """Division rounded up
+
+    Parameters
+    ----------
+    a : number
+        The numerator
+    b : number
+        The denominator
+
+    Reference
+    ---------
+    http://stackoverflow.com/questions/14822184/is-there-a-ceiling-equivalent\
+-of-operator-in-python
+    """
+    return -(-a // b)
+
+
+def to_float(l):
+    """Converts an iterable in a list of floats
+
+    Parameters
+    ----------
+    l : iterable
+        The iterable to be converted to float
+    """
+    return [float(el) for el in l]
+
+
+def to_int(l):
+    """Converts an iterable in a list of ints
+
+    Parameters
+    ----------
+    l : iterable
+        The iterable to be converted to float
+    """
+    return [int(el) for el in l]
