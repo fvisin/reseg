@@ -3,6 +3,7 @@ import cPickle as pkl
 import collections
 import matplotlib.pyplot as plt
 import os
+import random
 from shutil import move
 import sys
 import time
@@ -216,7 +217,13 @@ def getFunctions(input_var, target_var, class_balance_w_var, l_pred,
     loss = lasagne.objectives.categorical_crossentropy(
         prediction, target_var)
 
-    loss = class_balance_w_var * loss.mean()
+    loss *= class_balance_w_var
+    loss = loss.reshape((input_var.shape[0], -1))
+    # Compute the cumulative loss (over the pixels) per minibatch
+    loss = T.sum(loss, axis=1)
+    # Compute the mean loss
+    loss = T.mean(loss, axis=0)
+
     if weight_decay > 0:
         l2_penalty = lasagne.regularization.regularize_network_params(
             l_pred,
@@ -601,11 +608,9 @@ def train(saveto='model.npz',
     # Compute the indexes of the images to be saved
     if isinstance(n_save, collections.Iterable):
         samples_ids = np.array(n_save)
-    elif isinstance(n_save, int) and n_save > 0:
-        list_n = [len(s) for s in [train[0], valid[0], test[0]] if len(s) > 0]
-        n_save = min(n_save, *list_n)
-        samples_ids = np.arange(n_save) if n_save != -1 else np.array([-1])
-        rng.shuffle(samples_ids)
+    elif isinstance(n_save, int):
+        list_n = [random.sample(len(s), min(len(s), n_save)) for s in 
+                  [train[0], valid[0], test[0]]]
     options['samples_ids'] = samples_ids
 
     # Retrieve basic size informations and split train variables
@@ -657,7 +662,7 @@ def train(saveto='model.npz',
     input_shape = (batch_size, cheight, cwidth, cchannels)
     input_var = T.tensor4('inputs')
     target_var = T.ivector('targets')
-    class_balance_w_var = T.scalar('class_balance_w_var')
+    class_balance_w_var = T.vector('class_balance_w_var')
 
     # Set the RandomStream to assure repeatability
     lasagne.random.set_rng(rng)
@@ -794,7 +799,7 @@ def train(saveto='model.npz',
             # Class balance
             class_balance_w = 1
             if class_balance in ['median_freq_cost', 'rare_freq_cost']:
-                class_balance_w = np.sum(w_freq[targets_flat]).astype(floatX)
+                class_balance_w = w_freq[targets_flat].astype(floatX)
 
             # Compute cost
             cost = f_train(inputs, targets_flat, class_balance_w)
