@@ -653,9 +653,9 @@ def train(saveto='model.npz',
         w_freq_shared = theano.shared(w_freq)
 
     if validFreq == -1:
-        validFreq = len(x_train)
+        validFreq = len(x_train)/batch_size
     if saveFreq == -1:
-        saveFreq = len(x_train)
+        saveFreq = len(x_train)/batch_size
 
     # Model compilation
     # -----------------
