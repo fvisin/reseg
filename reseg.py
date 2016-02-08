@@ -33,6 +33,7 @@ import fashionista
 import oxford_flowers
 import kitti_road
 import nyu_depth
+import sunrgbd
 
 floatX = theano.config.floatX
 intX = 'uint8'
@@ -45,7 +46,8 @@ datasets = {'camvid': (camvid.load_data, camvid.properties),
             'fashionista': (fashionista.load_data, fashionista.properties),
             'flowers': (oxford_flowers.load_data, oxford_flowers.properties),
             'kitti_road': (kitti_road.load_data, kitti_road.properties),
-            'nyu_depth': (nyu_depth.load_data, nyu_depth.properties)}
+            'nyu_depth': (nyu_depth.load_data, nyu_depth.properties),
+            'sunrgbd': (sunrgbd.load_data, sunrgbd.properties)}
 
 
 def get_dataset(name):

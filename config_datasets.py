@@ -146,14 +146,16 @@ colormap_fashionista = OrderedDict([
     ])
 
 
-# ##### HORSES ##### #
+# ##### FLOWERS ##### #
+# ---------------------
 colormap_flowers = OrderedDict([
-    (0, np.array([128, 64, 128], dtype=np.uint8)),  # non road
-    (1, np.array([64, 0, 128], dtype=np.uint8)),  # road
+    (0, np.array([128, 64, 128], dtype=np.uint8)),
+    (1, np.array([64, 0, 128], dtype=np.uint8)),
     ])
 
 
 # ##### HORSES ##### #
+# --------------------
 colormap_horses = OrderedDict([
     (0, np.array([255, 255, 255], dtype=np.uint8)),  # Horse
     (1, np.array([0, 0, 0], dtype=np.uint8))  # Unlabeled
@@ -162,6 +164,7 @@ colormap_horses = OrderedDict([
 headers_horses = ["Horses", "Non-horses"]
 
 # ##### NYU DEPTH ##### #
+# ----------------------
 # 40 classes
 nclasses = 41
 color_bins = np.linspace(0, 1, nclasses)
@@ -205,6 +208,27 @@ f = sio.loadmat(path_mapping,
 headers_nyu_depth04 = np.append(
     [ff.encode("utf-8") for ff in f['className']], "Void").tolist()
 
+
+# ##### SUNRGBD ##### #
+# --------------------
+# 37 classes + 1
+nclasses = 38
+color_bins = np.linspace(0, 1, nclasses)
+norm = mpl.colors.Normalize(vmin=0, vmax=1)
+m = cm.ScalarMappable(norm=norm, cmap=plt.get_cmap('Set1'))
+colormap_sunrgbd = m.to_rgba(color_bins)[:, :3]
+
+path_classlabels = os.path.join(
+    os.path.expanduser('~/exp/datasets/SUNRGBD/'),
+    'SUNRGBDtoolbox/Metadata/seg37list.mat')
+
+f = sio.loadmat(path_classlabels,
+                squeeze_me=True,
+                struct_as_record=False)
+headers_sunrgbd = np.append(
+    [ff.encode("utf-8") for ff in f['seg37list']], "Void").tolist()
+
+
 # DATASET DICTIONARIES #
 colormap_datasets = dict()
 colormap_datasets["camvid"] = colormap_camvid
@@ -220,6 +244,7 @@ for key, value in colormap_datasets.iteritems():
 
 colormap_datasets.update({'nyu_depth04': colormap_nyu_depth04})
 colormap_datasets.update({'nyu_depth40': colormap_nyu_depth40})
+colormap_datasets.update({'sunrgbd': colormap_sunrgbd})
 
 headers_datasets = dict()
 headers_datasets["camvid"] = headers_camvid
@@ -228,3 +253,5 @@ headers_datasets["kitti_road"] = headers_kitti_road
 headers_datasets["horses"] = headers_horses
 headers_datasets["nyu_depth04"] = headers_nyu_depth04
 headers_datasets["nyu_depth40"] = headers_nyu_depth40
+headers_datasets["sunrgbd"] = headers_sunrgbd
+
