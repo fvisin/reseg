@@ -3,8 +3,8 @@ from collections import Iterable
 import numpy as np
 import lasagne
 from lasagne.layers import get_output, get_output_shape
-from theano.sandbox.cuda.dnn import GpuDnnConvDesc, GpuDnnConvGradI
-from theano.sandbox.cuda.basic_ops import gpu_contiguous, gpu_alloc_empty
+from lasagne.layers.conv import TransposeConv2DLayer as DeconvLayer
+from theano.sandbox.cuda.basic_ops import gpu_contiguous
 import theano.tensor as T
 
 from padded import DynamicPaddingLayer, PaddedConv2DLayer as ConvLayer
@@ -504,6 +504,9 @@ class ReNetLayer(lasagne.layers.Layer):
         self.name = name
         self.stride = self.patch_size  # for now, it's not parametrized
 
+        batch_size = -1
+        cheight, cwidth, cchannels = get_output_shape(l_in)[1:]
+
         # Dynamically add padding if the input is not a multiple of the
         # patch size (expected input format: bs, ch, rows, cols)
         l_in = DynamicPaddingLayer(l_in, patch_size, self.stride,
@@ -511,7 +514,7 @@ class ReNetLayer(lasagne.layers.Layer):
 
         # get_output(l_in).shape will result in an error in the
         # recurrent layers
-        batch_size, cchannels, cheight, cwidth = get_output_shape(l_in)
+        cchannels, cheight, cwidth = get_output_shape(l_in)[1:]
         pheight, pwidth = patch_size
         psize = pheight * pwidth * cchannels
 
@@ -542,7 +545,7 @@ class ReNetLayer(lasagne.layers.Layer):
         # #W, #H*bs, cc * ph * pw
         l_sub0 = lasagne.layers.ReshapeLayer(
             l_in,
-            (npatchesW, npatchesH * batch_size, psize),
+            (npatchesW, -1, psize),
             name=self.name + "_sub0_reshape0")
 
         # Left/right scan: #W, #H*bs, 2*hid
@@ -604,7 +607,7 @@ class ReNetLayer(lasagne.layers.Layer):
         # The RNN Layer needs a 3D tensor input: #H, #W*bs, psize
         l_sub1 = lasagne.layers.ReshapeLayer(
             input_sublayer1,
-            (npatchesH, npatchesW * batch_size, psize),
+            (npatchesH, -1, psize),
             name=self.name + "_sub1_reshape")
 
         # Down/up scan: #H, #W*bs, 2*hid
@@ -879,7 +882,8 @@ class LinearUpsamplingLayer(lasagne.layers.Layer):
         # upsample
         pred = T.dot(input_arr, self.W) + self.b
 
-        batch_size, nrows, ncolumns, _ = self.input_shape
+        nrows, ncolumns = self.input_shape[1:3]
+        batch_size = -1
         nclasses = self.nclasses
         expand_height = self.expand_height
         expand_width = self.expand_width
@@ -906,7 +910,7 @@ class LinearUpsamplingLayer(lasagne.layers.Layer):
                 self.nclasses)
 
 
-class DeconvLayer(lasagne.layers.Layer):
+class asdDeconvLayer(lasagne.layers.Layer):
     """An upsampling Layer that transposes a convolution
 
     This layer upsamples its input using the transpose of a convolution,
@@ -920,7 +924,7 @@ class DeconvLayer(lasagne.layers.Layer):
                  untie_biases=False, W=lasagne.init.GlorotUniform(),
                  b=lasagne.init.Constant(0.), nonlinearity=None,
                  flip_filters=False, **kwargs):
-        super(DeconvLayer, self).__init__(incoming, **kwargs)
+        super(asdDeconvLayer, self).__init__(incoming, **kwargs)
         self.num_filters = num_filters
         self.filter_size = lasagne.utils.as_tuple(filter_size, 2, int)
         self.stride = lasagne.utils.as_tuple(stride, 2, int)

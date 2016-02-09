@@ -661,7 +661,7 @@ def train(saveto='model.npz',
     # -----------------
     print("Building model ...")
 
-    input_shape = (batch_size, cheight, cwidth, cchannels)
+    input_shape = (None, cheight, cwidth, cchannels)
     input_var = T.tensor4('inputs')
     target_var = T.ivector('targets')
     class_balance_w_var = T.vector('class_balance_w_var')
@@ -799,7 +799,7 @@ def train(saveto='model.npz',
             st = time.time()
 
             # Class balance
-            class_balance_w = 1
+            class_balance_w = np.ones(np.prod(inputs.shape[:3])).astype(floatX)
             if class_balance in ['median_freq_cost', 'rare_freq_cost']:
                 class_balance_w = w_freq[targets_flat].astype(floatX)
 
