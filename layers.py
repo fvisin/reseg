@@ -1,12 +1,15 @@
-import collections
+from collections import Iterable
+
 import numpy as np
-import theano.tensor as T
 import lasagne
-from lasagne.layers import get_output_shape
-from theano.sandbox.cuda.dnn import dnn_conv
+from lasagne.layers import get_all_layers, get_output, get_output_shape
 from theano.sandbox.cuda.dnn import GpuDnnConvDesc, GpuDnnConvGradI
 from theano.sandbox.cuda.basic_ops import gpu_contiguous, gpu_alloc_empty
+import theano.tensor as T
+
 from padded import DynamicPaddingLayer, PaddedConv2DLayer as ConvLayer
+from padded import get_equivalent_input_padding
+from utils import ceildiv, to_float, to_int
 
 
 class ReSegLayer(lasagne.layers.Layer):
@@ -25,7 +28,8 @@ class ReSegLayer(lasagne.layers.Layer):
                  out_filters_stride,
                  out_W_init=lasagne.init.GlorotUniform(),
                  out_b_init=lasagne.init.Constant(0.),
-                 out_nonlinearity=lasagne.nonlinearities.rectify,
+                 out_nonlinearity=lasagne.nonlinearities.identity,
+                 hypotetical_fm_size=np.array((100.0, 100.0)),
                  # input ConvLayers
                  in_nfilters=None,
                  in_filters_size=((3, 3), (3, 3)),
@@ -95,6 +99,10 @@ class ReSegLayer(lasagne.layers.Layer):
             Initializer for b
         out_nonlinearity : Theano shared variable, numpy array or callable
             The nonlinearity to be applied after the upsampling
+        hypotetical_fm_size : float
+            The hypotetical size of the feature map that would be input
+            of the layer if the input image of the whole network was of
+            size (100, 100)
         RecurrentNet : lasagne.layers.Layer
             A recurrent layer class
         nonlinearity : callable or None
@@ -201,6 +209,7 @@ class ReSegLayer(lasagne.layers.Layer):
                 l_in,
                 (0, 3, 1, 2),
                 name=self.name + "_input_conv_dimshuffle")
+            self.sublayers.append(l_in_conv)
 
             for i, (nf, f_size, stride) in enumerate(
                     zip(in_nfilters, in_filters_size, in_filters_stride)):
@@ -218,6 +227,10 @@ class ReSegLayer(lasagne.layers.Layer):
                     pad='valid',
                     name=self.name + '_input_conv_layer' + str(i)
                 )
+                self.sublayers.append(l_in_conv)
+                self.hypotetical_fm_size = (
+                    (self.hypotetical_fm_size - 1) * stride + f_size)
+
                 # Print shape
                 out_shape = get_output_shape(l_in_conv)
                 out_shape = (out_shape[0], out_shape[2],
@@ -229,6 +242,7 @@ class ReSegLayer(lasagne.layers.Layer):
                 l_in_conv,
                 (0, 2, 3, 1),
                 name=self.name + "_input_conv_undimshuffle")
+            self.sublayers.append(l_in)
 
         # ReNet layers
         l_renet = l_in
@@ -258,28 +272,97 @@ class ReSegLayer(lasagne.layers.Layer):
                                  rnn_W_hid_to_hid=rnn_W_hid_to_hid,
                                  rnn_b=rnn_b,
                                  name=self.name + '_renet' + str(lidx))
-            out_shape = get_output_shape(l_renet)
+            self.sublayers.append(l_renet)
+            self.hypotetical_fm_size /= (pwidth[lidx], pheight[lidx])
 
             # TODO: insert NIN 1x1 ConvLayer after ReNet
 
+            # Print shape
+            out_shape = get_output_shape(l_renet)
             n_rnns = 2 if stack_sublayers[lidx] else 4
             print('ReNet: After {} rnns {}x{} @ {}: {}'.format(
                 n_rnns, pheight[lidx], pwidth[lidx], dim_proj[lidx],
                 out_shape))
 
         # Upsampling
-        if out_upsampling_type == 'grad':
-            # We use a custom Deconv layer: UpsampleConv2DDNNLayer
-            # the input has to be in the 'bc01' shape
-            l_renet_out = lasagne.layers.DimshuffleLayer(
+        if out_upsampling_type == 'autograd':
+            nlayers = len(out_nfilters)
+            assert nlayers > 1
+
+            # Compute the upsampling ratio and the corresponding params
+            # downsampled_size = np.array(
+            #    to_float(get_output_shape(l_renet)[1:3]))
+            # upsampled_size = np.array(to_float(
+            #    np.array(get_all_layers(l_renet)[0].shape[1:3]) +
+            #    get_equivalent_input_padding(l_renet)))
+            # up_ratio = (upsampled_size / downsampled_size) ** (
+            #            1. / nlayers)
+            h2 = np.array((100., 100.))
+            up_ratio = (h2 / self.hypotetical_fm_size) ** (1. / nlayers)
+            h1 = h2 / up_ratio
+            h0 = h1 / up_ratio
+            stride = to_int(ceildiv(h2 - h1, h1 - h0))
+            filter_size = to_int(ceildiv((h1 * (h1 - 1) + h2 - h2 * h0),
+                                         (h1 - h0)))
+
+            # Convert to 'bc01' format
+            l_upsampling = lasagne.layers.DimshuffleLayer(
                 l_renet,
                 (0, 3, 1, 2),
                 name=self.name + '_grad_dimshuffle')
+            self.sublayers.append(l_upsampling)
+            h0 = get_output(l_upsampling).shape[2:]
+
+            for l in range(nlayers):
+                l_upsampling = DeconvLayer(
+                    l_upsampling,
+                    num_filters=out_nfilters[l],
+                    filter_size=filter_size,
+                    stride=stride,
+                    W=out_W_init,
+                    b=out_b_init,
+                    nonlinearity=out_nonlinearity)
+                self.sublayers.append(l_upsampling)
+                h1 = get_output(l_upsampling).shape[2:]
+
+                # CROP
+                # upsampled_size = np.array(to_float(
+                #    np.array(get_all_layers(l_renet)[0].shape[1:3]) +
+                #    get_equivalent_input_padding(l_renet)))
+                # TODO last layer check
+                crop = T.max(T.stack([h1 - h0 * up_ratio, T.zeros(2)]), axis=0)
+                crop = crop.astype('uint8')  # round down
+                l_upsampling = CropLayer(
+                    l_upsampling,
+                    crop,
+                    data_format='bc01')
+                self.sublayers.append(l_upsampling)
+                h0 = get_output(l_upsampling).shape[2:]
+
+                # Print shape
+                out_shape = get_output_shape(l_upsampling)
+                out_shape = [out_shape[i] for i in [0, 2, 3, 1]]
+                print('Upsample: After grad @ nf: {}, fs: {}, str: {} : {}'.
+                      format(out_nfilters[l], filter_size, stride, out_shape))
+
+            l_out = lasagne.layers.DimshuffleLayer(
+                l_upsampling,
+                (0, 2, 3, 1),
+                name=self.name + '_grad_undimshuffle')
+            self.sublayers.append(l_out)
+
+        elif out_upsampling_type == 'grad':
+            # DeconvLayer expects the input to be in bc01 format
+            l_upsampling = lasagne.layers.DimshuffleLayer(
+                l_renet,
+                (0, 3, 1, 2),
+                name=self.name + '_grad_dimshuffle')
+            self.sublayers.append(l_upsampling)
 
             for i, (nf, f_size, stride) in enumerate(zip(
                     out_nfilters, out_filters_size, out_filters_stride)):
-                renet_layer_out = UpsampleConv2DDNNLayer(
-                    l_renet_out,
+                l_upsampling = DeconvLayer(
+                    l_upsampling,
                     num_filters=nf,
                     filter_size=f_size,
                     stride=stride,
@@ -288,18 +371,20 @@ class ReSegLayer(lasagne.layers.Layer):
                     W=out_W_init,
                     b=out_b_init,
                     nonlinearity=out_nonlinearity)
-                out_shape = get_output_shape(renet_layer_out)
-                out_shape = (out_shape[0], out_shape[2],
-                             out_shape[3], out_shape[1])
+                self.sublayers.append(l_upsampling)
 
-                print('Upsample: After grad @ nf: {}, fs: {}, str: {} : {}'.
-                      format(nf, f_size, stride, out_shape))
+                # Print shape
+                out_shape = get_output_shape(l_upsampling)
+                out_shape = [out_shape[i] for i in [0, 2, 3, 1]]
+                print('Upsample: After {}x{} (str {}x{}) @ {}: {}'.format(
+                    f_size[0], f_size[1], stride[0], stride[1], nf, out_shape))
 
             # Go back to b01c
             l_out = lasagne.layers.DimshuffleLayer(
-                renet_layer_out,
+                l_upsampling,
                 (0, 2, 3, 1),
                 name=self.name + '_grad_undimshuffle')
+            self.sublayers.append(l_out)
 
         elif out_upsampling_type == 'linear':
             expand_height = np.prod(pheight)
@@ -309,6 +394,7 @@ class ReSegLayer(lasagne.layers.Layer):
                                           expand_width,
                                           nclasses,
                                           name="linear_upsample_layer")
+            self.sublayers.append(l_out)
         self.l_out = l_out
 
         # HACK LASAGNE
@@ -321,7 +407,12 @@ class ReSegLayer(lasagne.layers.Layer):
             self.input_layer = self.l_out
 
     def get_output_shape_for(self, input_shape):
-        return list(input_shape[0:3]) + [self.nclasses]
+        for layer in self.sublayers:
+            output_shape = layer.get_output_shape_for(input_shape)
+            input_shape = output_shape
+
+        return output_shape
+        # return list(input_shape[0:3]) + [self.nclasses]
 
     def get_output_for(self, input_var, **kwargs):
         # HACK LASAGNE
@@ -443,7 +534,14 @@ class ReNetLayer(lasagne.layers.Layer):
         self.n_hidden = n_hidden
         self.stack_sublayers = stack_sublayers
         self.name = name
+        self.stride = self.patch_size  # for now, it's not parametrized
 
+        # Dynamically add padding if the input is not a multiple of the
+        # patch size (expected input format: bs, ch, rows, cols)
+        l_in = DynamicPaddingLayer(l_in, patch_size, self.stride,
+                                   name=self.name + '_padding')
+
+        # TODO probabilmente dev'essere get_output.shape
         batch_size, cheight, cwidth, cchannels = get_output_shape(l_in)
         pheight, pwidth = patch_size
 
@@ -610,8 +708,8 @@ class ReNetLayer(lasagne.layers.Layer):
 
     def get_output_shape_for(self, input_shape):
         pheight, pwidth = self.patch_size
-        npatchesH = input_shape[1] / pheight
-        npatchesW = input_shape[2] / pwidth
+        npatchesH = ceildiv(input_shape[1], pheight)
+        npatchesW = ceildiv(input_shape[2], pwidth)
 
         if self.stack_sublayers:
             dim = 2 * self.n_hidden
@@ -856,39 +954,104 @@ class LinearUpsamplingLayer(lasagne.layers.Layer):
                 self.nclasses)
 
 
-def deconv_length(output_length, filter_size, stride, pad=0):
-    if output_length is None:
-        return None
+class Deconv2DLayer(lasagne.layers.Layer):
+    """**TEMPORARY**
 
-    output_length = output_length * stride
-    if pad == 'valid':
-        input_length = output_length + filter_size - 1
-    elif pad == 'full':
-        input_length = output_length - filter_size + 1
-    elif pad == 'same':
-        input_length = output_length
-    elif isinstance(pad, int):
-        input_length = output_length - 2 * pad + filter_size - 1
-    else:
-        raise ValueError('Invalid pad: {0}'.format(pad))
+    I tried to follow this: https://github.com/Lasagne/Lasagne/issues/524
+    and modify it according to what I did in DeconvLayer. I don't know
+    if there is any difference, I keep it for now to test if one is
+    performing better/worse than the other.
+    """
 
-    return input_length
+    def __init__(self, incoming, num_filters, filter_size, stride=1, pad=0,
+                 untie_biases=False, W=lasagne.init.GlorotUniform(),
+                 b=lasagne.init.Constant(0.),
+                 nonlinearity=lasagne.nonlinearities.rectify,
+                 flip_filters=False, **kwargs):
+        super(Deconv2DLayer, self).__init__(incoming, **kwargs)
+        self.num_filters = num_filters
+        self.filter_size = lasagne.utils.as_tuple(filter_size, 2, int)
+        self.stride = lasagne.utils.as_tuple(stride, 2, int)
+        self.pad = lasagne.utils.as_tuple(pad, 2, int)
+        self.untie_biases = untie_biases
+        self.flip_filters = flip_filters
+        W_shape = (self.input_shape[1], num_filters) + self.filter_size
+        self.W = self.add_param(W, W_shape, name="W")
+        if b is None:
+            self.b = None
+        else:
+            if self.untie_biases:
+                biases_shape = (num_filters, self.output_shape[2],
+                                self.output_shape[3])
+            else:
+                biases_shape = (num_filters,)
+            self.b = self.add_param(b, biases_shape, name="b",
+                                    regularizable=False)
+
+        if nonlinearity is None:
+            nonlinearity = lasagne.nonlinearities.identity
+        self.nonlinearity = nonlinearity
+
+    def get_output_shape_for(self, input_shape):
+        batch_size = input_shape[0]
+        pad = self.pad if isinstance(self.pad, tuple) else (self.pad,) * 2
+
+        output_rows = get_deconv_size(input_shape[2],
+                                      self.filter_size[0],
+                                      self.stride[0],
+                                      pad[0])
+
+        output_columns = get_deconv_size(input_shape[3],
+                                         self.filter_size[1],
+                                         self.stride[1],
+                                         pad[1])
+
+        return (batch_size, self.num_filters, output_rows, output_columns)
+
+    def get_output_for(self, input_arr, **kwargs):
+        in_shape = get_output(self.input_layer).shape
+        out_shape = get_deconv_size(in_shape[2:], self.filter_size,
+                                    self.stride, 0)
+        out_shape = T.concatenate(([in_shape[0], self.num_filters], out_shape))
+        input_arr = gpu_contiguous(input_arr)
+        filters = gpu_contiguous(self.W)
+
+        op = T.nnet.abstract_conv.AbstractConv2d_gradInputs(
+            imshp=(out_shape[0], out_shape[1], out_shape[2], out_shape[3]),
+            # imshp=out_shape,
+            kshp=filters.shape,
+            subsample=self.stride,
+            border_mode=self.pad)
+        grad = op(self.W, input_arr, self.output_shape[2:])
+
+        if self.b is None:
+            activation = grad
+        elif self.untie_biases:
+            activation = grad + self.b.dimshuffle('x', 0, 1, 2)
+        else:
+            activation = grad + self.b.dimshuffle('x', 0, 'x', 'x')
+        return self.nonlinearity(activation)
 
 
 class DeconvLayer(lasagne.layers.Layer):
-    """
-    This is a Deconvolutional layer, basically the same that was implemented
-    in ReSeg framework, but now is a Lasagne layer.
-    It's an adaptation of 'ebenolson' implementation
-    with  some improvement using cuda sandox functions
-    https://github.com/ebenolson/Lasagne/blob/deconv/lasagne/layers/dnn.py
+    """An upsampling Layer that transposes a convolution
 
-    Note: remeber to pass the input in the form of
-            batch, cchannel, row, col
+    This layer upsamples its input using the transpose of a convolution,
+    also known as fractional convolution in some contexts. This code is
+    an adaptation of ebenolson's implementation [1] improved to use the
+    methods in cuda sandbox.
+
+    References
+    ----------
+    [1] https://github.com/ebenolson/Lasagne/blob/deconv/lasagne/layers/dnn.py
+
+    Notes
+    -----
+    Expects the input to be in format: batchsize, channels, rows, cols
     """
 
     def __init__(self, incoming, num_filters, filter_size, stride=(2, 2),
-                 pad=0, untie_biases=False, W=lasagne.init.GlorotUniform(),
+                 untie_biases=False, W=lasagne.init.GlorotUniform(),
                  b=lasagne.init.Constant(0.), nonlinearity=None,
                  flip_filters=False, **kwargs):
         super(DeconvLayer, self).__init__(incoming, **kwargs)
@@ -902,20 +1065,11 @@ class DeconvLayer(lasagne.layers.Layer):
         self.stride = lasagne.utils.as_tuple(stride, 2)
         self.untie_biases = untie_biases
         self.flip_filters = flip_filters
+        self.pad = (0, 0)
 
-        if pad == 'valid':
-            self.pad = (0, 0)
-        elif pad == 'full':
-            self.pad = 'full'
-        elif pad == 'same':
-            if any(s % 2 == 0 for s in self.filter_size):
-                raise NotImplementedError(
-                    '`same` padding requires odd filter size.')
-            self.pad = (self.filter_size[0] // 2, self.filter_size[1] // 2)
-        else:
-            self.pad = lasagne.utils.as_tuple(pad, 2, int)
-
-        self.W = self.add_param(W, self.get_W_shape(), name="W")
+        n_in_channels = self.input_shape[1]
+        W_shape = [n_in_channels, num_filters] + list(self.filter_size)
+        self.W = self.add_param(W, W_shape, name="W")
         if b is None:
             self.b = None
         else:
@@ -927,41 +1081,42 @@ class DeconvLayer(lasagne.layers.Layer):
             self.b = self.add_param(b, biases_shape, name="b",
                                     regularizable=False)
 
-    def get_W_shape(self):
-        num_input_channels = self.input_shape[1]
-        return (num_input_channels, self.num_filters, self.filter_size[0],
-                self.filter_size[1])
-
     def get_output_shape_for(self, input_shape):
         batch_size = input_shape[0]
         pad = self.pad if isinstance(self.pad, tuple) else (self.pad,) * 2
 
-        output_rows = deconv_length(input_shape[2],
-                                    self.filter_size[0],
-                                    self.stride[0],
-                                    pad[0])
+        output_rows = get_deconv_size(input_shape[2],
+                                      self.filter_size[0],
+                                      self.stride[0],
+                                      pad[0])
 
-        output_columns = deconv_length(input_shape[3],
-                                       self.filter_size[1],
-                                       self.stride[1],
-                                       pad[1])
+        output_columns = get_deconv_size(input_shape[3],
+                                         self.filter_size[1],
+                                         self.stride[1],
+                                         pad[1])
 
         return (batch_size, self.num_filters, output_rows, output_columns)
 
-    def get_output_for(self, input, **kwargs):
+    def get_output_for(self, state_below, **kwargs):
         # by default we assume 'cross', consistent with corrmm.
         conv_mode = 'conv' if self.flip_filters else 'cross'
 
         filters = gpu_contiguous(self.W)
-        state_below = gpu_contiguous(input)
-        out_shape = T.as_tensor_variable(self.output_shape)
+        state_below = gpu_contiguous(state_below)
+        # out_shape = T.as_tensor_variable(self.output_shape)
+        in_shape = get_output(self.input_layer).shape
+        out_shape = get_deconv_size(in_shape[2:], self.filter_size,
+                                    self.stride, np.array(self.pad))
+        out_shape = T.concatenate(([in_shape[0], self.num_filters], out_shape))
 
         desc = GpuDnnConvDesc(border_mode=self.pad,
                               subsample=self.stride,
                               conv_mode=conv_mode)(out_shape,
                                                    filters.shape)
         grad = GpuDnnConvGradI()(filters, state_below,
-                                 gpu_alloc_empty(*out_shape), desc)
+                                 gpu_alloc_empty(out_shape[0], out_shape[1],
+                                                 out_shape[2], out_shape[3]),
+                                 desc)
 
         if self.b is None:
             activation = grad
@@ -972,103 +1127,38 @@ class DeconvLayer(lasagne.layers.Layer):
         return self.nonlinearity(activation)
 
 
-class UpsampleConv2DDNNLayer(lasagne.layers.Layer):
-    def __init__(self, incoming, num_filters, filter_size, stride=(2, 2),
-                 pad=0, untie_biases=False, W=lasagne.init.GlorotUniform(),
-                 b=lasagne.init.Constant(0.),
-                 nonlinearity=lasagne.nonlinearities.rectify,
-                 flip_filters=False, **kwargs):
-        """__init__
+def get_deconv_size(input_size, filter_size, stride, pad):
+    if input_size is None:
+        return None
 
-        Parameters
-        ----------
-        incoming :
-            The
-        num_filters :
-            The
-        filter_size :
-            The
-        stride :
-            The
-        """
-        super(UpsampleConv2DDNNLayer, self).__init__(incoming, **kwargs)
-        if nonlinearity is None:
-            self.nonlinearity = lasagne.nonlinearities.identity
-        else:
-            self.nonlinearity = nonlinearity
+    if isinstance(pad, (int, Iterable)) and not isinstance(pad, str):
+        output_size = (input_size + 2*pad - 1) * stride + filter_size
+    elif pad == 'full':
+        output_size = input_size * stride - filter_size - stride + 2
+    elif pad == 'valid':
+        output_size = (input_size - 1) * stride + filter_size
+    elif pad == 'same':
+        output_size = input_size
+    return output_size
 
-        self.num_filters = num_filters
-        self.filter_size = lasagne.utils.as_tuple(filter_size, 2)
-        self.stride = lasagne.utils.as_tuple(stride, 2)
-        self.untie_biases = untie_biases
-        self.flip_filters = flip_filters
 
-        if pad == 'valid':
-            self.pad = (0, 0)
-        elif pad == 'full':
-            self.pad = 'full'
-        elif pad == 'same':
-            if any(s % 2 == 0 for s in self.filter_size):
-                raise NotImplementedError(
-                    '`same` padding requires odd filter size.')
-            self.pad = (self.filter_size[0] // 2, self.filter_size[1] // 2)
-        else:
-            self.pad = lasagne.utils.as_tuple(pad, 2, int)
-
-        self.W = self.add_param(W, self.get_W_shape(), name="W")
-        if b is None:
-            self.b = None
-        else:
-            if self.untie_biases:
-                biases_shape = (num_filters, self.output_shape[2],
-                                self.output_shape[3])
-            else:
-                biases_shape = (num_filters,)
-            self.b = self.add_param(b, biases_shape, name="b",
-                                    regularizable=False)
-
-    def get_W_shape(self):
-        num_input_channels = self.input_shape[1]
-        return (num_input_channels, self.num_filters, self.filter_size[0],
-                self.filter_size[1])
-
-    def get_output_shape_for(self, input_shape):
-        batch_size = input_shape[0]
-        pad = self.pad if isinstance(self.pad, tuple) else (self.pad,) * 2
-
-        output_rows = deconv_length(input_shape[2],
-                                    self.filter_size[0],
-                                    self.stride[0],
-                                    pad[0])
-
-        output_columns = deconv_length(input_shape[3],
-                                       self.filter_size[1],
-                                       self.stride[1],
-                                       pad[1])
-
-        return (batch_size, self.num_filters, output_rows, output_columns)
-
-    def get_output_for(self, input, **kwargs):
-        # by default we assume 'cross', consistent with corrmm.
-        conv_mode = 'conv' if self.flip_filters else 'cross'
-
-        image = T.alloc(0., *self.output_shape)
-        conved = dnn_conv(img=image,
-                          kerns=self.W,
-                          subsample=self.stride,
-                          border_mode=self.pad,
-                          conv_mode=conv_mode
-                          )
-
-        grad = T.grad(conved.sum(), wrt=image, known_grads={conved: input})
-
-        if self.b is None:
-            activation = grad
-        elif self.untie_biases:
-            activation = grad + self.b.dimshuffle('x', 0, 1, 2)
-        else:
-            activation = grad + self.b.dimshuffle('x', 0, 'x', 'x')
-        return self.nonlinearity(activation)
+# def deconv_length(output_length, filter_size, stride, pad=0):
+#     if output_length is None:
+#         return None
+#
+#     output_length = output_length * stride
+#     if pad == 'valid':
+#         input_length = output_length + filter_size - 1
+#     elif pad == 'full':
+#         input_length = output_length - filter_size + 1
+#     elif pad == 'same':
+#         input_length = output_length
+#     elif isinstance(pad, int):
+#         input_length = output_length - 2 * pad + filter_size - 1
+#     else:
+#         raise ValueError('Invalid pad: {0}'.format(pad))
+#
+#     return input_length
 
 
 class CropLayer(lasagne.layers.Layer):

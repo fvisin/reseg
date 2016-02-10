@@ -9,6 +9,7 @@ import time
 
 # Related third party imports
 import lasagne
+from lasagne.layers import get_output
 import numpy as np
 from skimage.data import load
 from skimage.color import label2rgb
@@ -19,7 +20,7 @@ from theano.compile.nanguardmode import NanGuardMode
 # Local application/library specific imports
 from config_datasets import color_list_datasets
 from get_info_model import print_params
-from layers import ReSegLayer
+from layers import CropLayer, ReSegLayer
 from subprocess import check_output
 from utils import iterate_minibatches, validate, save_with_retry
 
@@ -97,6 +98,12 @@ def buildReSeg(input_shape, input_var,
     l_in = lasagne.layers.InputLayer(shape=input_shape,
                                      input_var=input_var,
                                      name="input_layer")
+    # To know the upsampling ratio we compute what is the feature map
+    # size at the end of the downsampling pathway for an hypotetical
+    # initial size of 100 (we just need the ratio, so we don't care
+    # about the actual size)
+    hypotetical_fm_size = np.array((100.0, 100.0))
+    l_conv = l_in
 
     # Pretrained vgg16
     if in_nfilters == 'vgg':
@@ -106,6 +113,7 @@ def buildReSeg(input_shape, input_var,
         l_vgg16 = buildVgg16(l_conv, 'conv3_3', False)
         # Back to batchsize, rows, cols, ch
         l_conv = lasagne.layers.DimshuffleLayer(l_vgg16, (0, 2, 3, 1))
+        hypotetical_fm_size /= 4
 
     l_reseg = ReSegLayer(l_conv, n_layers, pheight, pwidth, dim_proj,
                          nclasses, stack_sublayers,
@@ -117,6 +125,7 @@ def buildReSeg(input_shape, input_var,
                          out_W_init=out_W_init,
                          out_b_init=out_b_init,
                          out_nonlinearity=out_nonlinearity,
+                         hypotetical_fm_size=hypotetical_fm_size,
                          # input ConvLayers
                          in_nfilters=in_nfilters,
                          in_filters_size=in_filters_size,
@@ -146,10 +155,19 @@ def buildReSeg(input_shape, input_var,
                          rnn_W_hid_to_hid=rnn_W_hid_to_hid,
                          rnn_b=rnn_b,
                          name='reseg')
+
+    # Crop
+    # TODO DO we need it?
+    target_size = get_output(l_in).shape[1:3]
+    crop = get_output(l_reseg).shape[1:3] - target_size
+    # crop = get_equivalent_input_padding(l_reseg)
+    l_out = CropLayer(l_reseg, crop, centered=False)
+
     # Reshape in 2D, last dimension is nclasses, where the softmax is applied
+    l_out_shape = get_output(l_out).shape
     l_out = lasagne.layers.ReshapeLayer(
-        l_reseg,
-        (T.prod(l_reseg.output_shape[0:3]), l_reseg.output_shape[3]),
+        l_out,
+        (T.prod(l_out_shape[0:3]), l_out_shape[3]),
         name='reshape_before_softmax')
 
     l_pred = lasagne.layers.NonlinearityLayer(
