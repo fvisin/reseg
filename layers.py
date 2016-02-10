@@ -152,11 +152,44 @@ class ReSegLayer(lasagne.layers.Layer):
         self.dim_proj = dim_proj
         self.nclasses = nclasses
         self.stack_sublayers = stack_sublayers
+        # upsampling
         self.out_upsampling_type = out_upsampling_type
         self.out_nfilters = out_nfilters
         self.out_filters_size = out_filters_size
         self.out_filters_stride = out_filters_stride
+        self.out_W_init = out_W_init
+        self.out_b_init = out_b_init
+        self.out_nonlinearity = out_nonlinearity
+        self.hypotetical_fm_size = hypotetical_fm_size
+        # input ConvLayers
+        self.in_nfilters = in_nfilters
+        self.in_filters_size = in_filters_size
+        self.in_filters_stride = in_filters_stride
+        self.in_W_init = in_W_init
+        self.in_b_init = in_b_init
+        self.in_nonlinearity = in_nonlinearity
+        # common recurrent layer params
+        self.RecurrentNet = RecurrentNet
+        self.nonlinearity = nonlinearity
+        self.hid_init = hid_init
+        self.grad_clipping = grad_clipping
+        self.precompute_input = precompute_input
+        self.mask_input = mask_input
+        # GRU specific params
+        self.gru_resetgate = gru_resetgate
+        self.gru_updategate = gru_updategate
+        self.gru_hidden_update = gru_hidden_update
+        self.gru_hid_init = gru_hid_init
+        # LSTM specific params
+        self.lstm_ingate = lstm_ingate
+        self.lstm_forgetgate = lstm_forgetgate
+        self.lstm_cell = lstm_cell
+        self.lstm_outgate = lstm_outgate
+        # RNN specific params
+        self.rnn_W_in_to_hid = rnn_W_in_to_hid
+        self.rnn_W_hid_to_hid = rnn_W_hid_to_hid
         self.name = name
+        self.sublayers = []
 
         (batch_size, cheight, cwidth, cchannels) = get_output_shape(l_in)
 
@@ -185,6 +218,7 @@ class ReSegLayer(lasagne.layers.Layer):
                     pad='valid',
                     name=self.name + '_input_conv_layer' + str(i)
                 )
+                # Print shape
                 out_shape = get_output_shape(l_in_conv)
                 out_shape = (out_shape[0], out_shape[2],
                              out_shape[3], out_shape[1])
@@ -226,7 +260,7 @@ class ReSegLayer(lasagne.layers.Layer):
                                  name=self.name + '_renet' + str(lidx))
             out_shape = get_output_shape(l_renet)
 
-            # TODO: insert dimensional reduction 1x1 Conv layer after ReNet
+            # TODO: insert NIN 1x1 ConvLayer after ReNet
 
             n_rnns = 2 if stack_sublayers[lidx] else 4
             print('ReNet: After {} rnns {}x{} @ {}: {}'.format(
@@ -418,25 +452,25 @@ class ReNetLayer(lasagne.layers.Layer):
         npatchesW = cwidth / pwidth
 
         # Split in patches
-        l_sub0 = lasagne.layers.ReshapeLayer(
+        l_in = lasagne.layers.ReshapeLayer(
             l_in,
             (batch_size, npatchesH, pheight, npatchesW, pwidth, cchannels),
             name=self.name + "_reshape0")
 
-        l_sub0 = lasagne.layers.DimshuffleLayer(
-            l_sub0,
+        l_in = lasagne.layers.DimshuffleLayer(
+            l_in,
             (0, 1, 3, 2, 4, 5),
             name=self.name + "_dimshuffle0")
 
-        l_sub0 = lasagne.layers.ReshapeLayer(
-            l_sub0,
+        l_in = lasagne.layers.ReshapeLayer(
+            l_in,
             (batch_size, npatchesH, npatchesW, pheight * pwidth * cchannels),
             name=self.name + "_reshape1")
 
         # FIRST SUBLAYER
         # The GRU Layer needs a 3D tensor input
         l_sub0 = lasagne.layers.ReshapeLayer(
-            l_sub0,
+            l_in,
             (batch_size * npatchesH, npatchesW, pheight * pwidth * cchannels),
             name=self.name + "_sub0_reshape")
 
@@ -558,12 +592,12 @@ class ReNetLayer(lasagne.layers.Layer):
             name=self.name + "_sub1_undimshuffle0")
 
         # Set out_layer and out_shape
-        if not stack_sublayers:
+        if stack_sublayers:
+            self.out_layer = l_sub1
+        else:
             self.out_layer = lasagne.layers.ConcatLayer(
                 [l_sub0, l_sub1],
                 axis=3)
-        else:
-            self.out_layer = l_sub1
 
         # HACK LASAGNE
         # This will set `self.input_layer`, which is needed by Lasagne to find
@@ -791,9 +825,9 @@ class LinearUpsamplingLayer(lasagne.layers.Layer):
         self.W = self.add_param(W, (nfeatures_in, nfeatures_out), name='W')
         self.b = self.add_param(b, (nfeatures_out,), name='b')
 
-    def get_output_for(self, input, **kwargs):
+    def get_output_for(self, input_arr, **kwargs):
         # upsample
-        pred = T.dot(input, self.W) + self.b
+        pred = T.dot(input_arr, self.W) + self.b
 
         batch_size, nrows, ncolumns, _ = self.input_shape
         nclasses = self.nclasses
