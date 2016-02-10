@@ -1,8 +1,9 @@
 import warnings
 
+import numpy
+import lasagne
 from lasagne import init, nonlinearities
-from lasagne.layers import Pool2DLayer, Conv2DLayer
-from lasagne.layers.dnn import Conv2DDNNLayer
+from lasagne.layers import get_all_layers, Conv2DLayer, Layer, Pool2DLayer
 import theano
 from theano import tensor as T
 from theano.ifelse import ifelse
@@ -65,22 +66,9 @@ class PaddedConv2DLayer(Conv2DLayer):
 
     def get_output_for(self, input_arr, **kwargs):
         # Compute the padding required not to crop any pixel
-        in_shape = input_arr.shape[2:]  # bs, ch, rows, cols
-        in_shape -= self.W.shape[2:]
-        stride = self.stride
-        pad = in_shape % stride
-        pad = (stride - pad) % stride
-        # Zero pad
-        input_arr = ifelse(
-            T.eq(pad[0], 0),
-            input_arr,
-            T.concatenate((T.zeros_like(input_arr[:, :, 0:pad[0], :]),
-                           input_arr), 2))
-        input_arr = ifelse(
-            T.eq(pad[1], 0),
-            input_arr,
-            T.concatenate((T.zeros_like(input_arr[:, :, :, 0:pad[1]]),
-                           input_arr), 3))
+        input_arr, pad = zero_pad(
+            input_arr, self.filter_size, self.stride, 'bc01')
+
         # Erase self.pad to prevent theano from padding the input
         self.pad = 0
         ret = super(PaddedConv2DLayer, self).get_output_for(input_arr,
@@ -88,6 +76,10 @@ class PaddedConv2DLayer(Conv2DLayer):
         # Set pad to access it from outside
         self.pad = pad
         return ret
+
+    def get_output_shape_for(self, input_shape):
+        return zero_pad_shape(input_shape, self.filter_size, self.stride,
+                              'bc01')
 
     def get_equivalent_input_padding(self, layers_args=[]):
         """Compute the equivalent padding in the input layer
@@ -134,12 +126,84 @@ class PaddedPool2DLayer(Pool2DLayer):
 
     def get_output_for(self, input_arr, **kwargs):
         # Compute the padding required not to crop any pixel
+        input_arr, pad = zero_pad(
+            input_arr, self.pool_size, self.stride, 'bc01')
+        # Erase self.pad to prevent theano from padding the input
+        self.pad = 0
+        ret = super(PaddedConv2DLayer, self).convolve(input_arr, **kwargs)
+        # Set pad to access it from outside
+        self.pad = pad
+        return ret
+
+    def get_output_shape_for(self, input_shape):
+        return zero_pad_shape(input_shape, self.pool_size, self.stride,
+                              'bc01')
+
+    def get_equivalent_input_padding(self, layers_args=[]):
+        """Compute the equivalent padding in the input layer
+
+        See :func:`padded.get_equivalent_input_padding`
+        """
+        return(get_equivalent_input_padding(self, layers_args))
+
+
+class DynamicPaddingLayer(Layer):
+    def __init__(
+            self,
+            l_in,
+            patch_size,
+            stride,
+            data_format='b01c',
+            name='',
+            **kwargs):
+        """A Layer that zero-pads the input
+
+        Parameters
+        ----------
+        l_in : lasagne.layers.Layer
+            The input layer
+        patch_size :  iterable of int
+            The patch size
+        stride : iterable of int
+            The stride
+        data_format : string
+            The format of l_in, either `b01c` (batch, rows, cols,
+            channels) or `bc01` (batch, channels, rows, cols)
+        name = string
+            The name of the layer, optional
+        """
+        super(DynamicPaddingLayer, self).__init__(l_in, name, **kwargs)
+        self.l_in = l_in
+        self.patch_size = patch_size
+        self.stride = stride
+        self.data_format = data_format
+        self.name = name
+
+    def get_output_for(self, input_arr, **kwargs):
+        input_arr, pad = zero_pad(
+            input_arr, self.patch_size, self.stride, self.data_format)
+        self.pad = pad
+        return input_arr
+
+    def get_output_shape_for(self, input_shape):
+        return zero_pad_shape(input_shape, self.patch_size, self.stride,
+                              self.data_format, True)
+
+
+def zero_pad(input_arr, patch_size, stride, data_format='b01c'):
+    assert data_format in ['bc01', 'b01c']
+
+    if data_format == 'b01c':
+        in_shape = input_arr.shape[1:3]
+    else:
         in_shape = input_arr.shape[2:]  # bs, ch, rows, cols
-        in_shape -= self.W.shape[2:]
-        stride = self.stride
-        pad = in_shape % stride
-        pad = (stride - pad) % stride
-        # Zero pad
+    in_shape -= patch_size
+    pad = in_shape % stride
+    pad = (stride - pad) % stride
+
+    # TODO improve efficiency by allocating the full array of zeros and
+    # setting the subtensor afterwards
+    if data_format == 'bc01':
         input_arr = ifelse(
             T.eq(pad[0], 0),
             input_arr,
@@ -150,19 +214,43 @@ class PaddedPool2DLayer(Pool2DLayer):
             input_arr,
             T.concatenate((T.zeros_like(input_arr[:, :, :, 0:pad[1]]),
                            input_arr), 3))
-        # Erase self.pad to prevent theano from padding the input
-        self.pad = 0
-        ret = super(PaddedConv2DLayer, self).convolve(input_arr, **kwargs)
-        # Set pad to access it from outside
-        self.pad = pad
-        return ret
+    else:
+        input_arr = ifelse(
+            T.eq(pad[0], 0),
+            input_arr,
+            T.concatenate((T.zeros_like(input_arr[:, 0:pad[0], :, :]),
+                           input_arr), 1))
+        input_arr = ifelse(
+            T.eq(pad[1], 0),
+            input_arr,
+            T.concatenate((T.zeros_like(input_arr[:, :, 0:pad[1], :]),
+                           input_arr), 2))
+    return input_arr, pad
 
-    def get_equivalent_input_padding(self, layers_args=[]):
-        """Compute the equivalent padding in the input layer
 
-        See :func:`padded.get_equivalent_input_padding`
-        """
-        return(get_equivalent_input_padding(self, layers_args))
+def zero_pad_shape(input_shape, patch_size, stride, data_format,
+                   only_pad=False):
+    assert data_format in ['bc01', 'b01c']
+    patch_size = numpy.array(patch_size)
+    stride = numpy.array(stride)
+
+    if data_format == 'b01c':
+        im_shape = numpy.array(input_shape[1:3])
+    else:
+        im_shape = numpy.array(input_shape[2:])
+    pad = (im_shape - patch_size) % stride
+    pad = (stride - pad) % stride
+
+    if only_pad:
+        out_shape = list(im_shape + pad)
+    else:
+        out_shape = list((im_shape - patch_size + pad) / stride + 1)
+
+    if data_format == 'b01c':
+        out_shape = [input_shape[0]] + out_shape + [input_shape[3]]
+    else:
+        out_shape = list(input_shape[:2]) + out_shape
+    return list(out_shape)
 
 
 def get_equivalent_input_padding(layer, layers_args=[]):
@@ -170,24 +258,26 @@ def get_equivalent_input_padding(layer, layers_args=[]):
 
     A function to compute the equivalent padding of a sequence of
     convolutional and pooling layers. It memorizes the padding
-    of all the Layers up to the first Layer that is not an instance of
-    :class:``lasagne.layers.Pool2DLayer``,
-    :class:``lasagne.layers.Conv2DLayer``, or
-    :class:``lasagne.layers.Conv2DDNNLayer`` (which includes the padded
-    variants defined here). It then computes what would be the equivalent
-    padding in the Layer immediately before the chain of Layers that is
-    being taken into account.
+    of all the Layers up to the first InputLayer.
+    It then computes what would be the equivalent padding in the Layer
+    immediately before the chain of Layers that is being taken into account.
     """
+    # Initialize the DynamicPadding layers
+    lasagne.layers.get_output(layer)
     # Loop through conv and pool to collect data
-    while(isinstance(layer, (Pool2DLayer, Conv2DLayer, Conv2DDNNLayer))):
+    all_layers = get_all_layers(layer)
+    # while(not isinstance(layer, (InputLayer))):
+    for layer in all_layers:
         # Note: stride is numerical, but pad *could* be symbolic
-        pad, stride = (layer.pad, layer.stride)
-        if isinstance(pad, int):
-            pad = pad, pad
-        if isinstance(stride, int):
-            stride = stride, stride
-        layers_args.append((pad, stride))
-        layer = layer.input_layer
+        try:
+            pad, stride = (layer.pad, layer.stride)
+            if isinstance(pad, int):
+                pad = pad, pad
+            if isinstance(stride, int):
+                stride = stride, stride
+            layers_args.append((pad, stride))
+        except(AttributeError):
+            pass
 
     # Loop backward to compute the equivalent padding in the input
     # layer

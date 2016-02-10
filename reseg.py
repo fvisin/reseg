@@ -100,14 +100,14 @@ def buildReSeg(input_shape, input_var,
 
     # Pretrained vgg16
     if in_nfilters == 'vgg':
-        from vgg16 import build_model as buildVgg16
+        from vgg16 import buildVgg16
         # Convert to batchsize, ch, rows, cols
-        l_in = lasagne.layers.DimshuffleLayer(l_in, (0, 3, 1, 2))
-        l_vgg16 = buildVgg16(l_in, False, False)['conv4_3']
+        l_conv = lasagne.layers.DimshuffleLayer(l_conv, (0, 3, 1, 2))
+        l_vgg16 = buildVgg16(l_conv, 'conv3_3', False)
         # Back to batchsize, rows, cols, ch
-        l_in = lasagne.layers.DimshuffleLayer(l_vgg16, (0, 2, 3, 1))
+        l_conv = lasagne.layers.DimshuffleLayer(l_vgg16, (0, 2, 3, 1))
 
-    l_reseg = ReSegLayer(l_in, n_layers, pheight, pwidth, dim_proj,
+    l_reseg = ReSegLayer(l_conv, n_layers, pheight, pwidth, dim_proj,
                          nclasses, stack_sublayers,
                          # upsampling
                          out_upsampling,
