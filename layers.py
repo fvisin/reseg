@@ -1069,3 +1069,49 @@ class UpsampleConv2DDNNLayer(lasagne.layers.Layer):
         else:
             activation = grad + self.b.dimshuffle('x', 0, 'x', 'x')
         return self.nonlinearity(activation)
+
+
+class CropLayer(lasagne.layers.Layer):
+    def __init__(self, l_in, crop, data_format='b01c', centered=True,
+                 **kwargs):
+        super(CropLayer, self).__init__(l_in, crop, **kwargs)
+        assert data_format in ['bc01', 'b01c']
+        self.crop = crop
+        self.data_format = data_format
+        self.centered = centered
+
+    def get_output_shape_for(self, input_shape, **kwargs):
+        #  crop = self.crop
+
+        # if self.data_format == 'bc01':
+        #     input_shape[2] -= crop[0]
+        #     input_shape[3] -= crop[1]
+        # else:
+        #     input_shape[1] -= crop[0]
+        #     input_shape[2] -= crop[1]
+        if self.data_format == 'bc01':
+            input_shape = list(input_shape)
+            input_shape[2] = None
+            input_shape[3] = None
+        else:
+            input_shape = list(input_shape)
+            input_shape[1] = None
+            input_shape[2] = None
+        return input_shape
+
+    def get_output_for(self, input_arr, **kwargs):
+        crop = self.crop
+        # Indices have to be int
+        crop = crop.astype('int32')
+        if self.centered:
+            if self.data_format == 'bc01':
+                return input_arr[:, :, crop[0]/2:-crop[0] + crop[0]/2,
+                                 crop[1]/2:-crop[1] + crop[1]/2]
+            else:
+                return input_arr[:, crop[0]/2:-crop[0] + crop[0]/2,
+                                 crop[1]/2:-crop[1] + crop[1]/2, :]
+        else:
+            if self.data_format == 'bc01':
+                return input_arr[:, :, :-crop[0], :-crop[1]]
+            else:
+                return input_arr[:, :-crop[0], :-crop[1], :]
