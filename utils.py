@@ -6,7 +6,7 @@ import numpy as np
 from retrying import retry
 from skimage import img_as_float
 from sklearn.metrics import confusion_matrix
-from skimage.color import label2rgb
+from skimage.color import label2rgb, gray2rgb
 from skimage.io import imsave
 import theano
 
@@ -146,6 +146,14 @@ def validate(f_pred,
                                               samples_ids == [-1])):
                     # TODO fix daimler dataset --> Marco fix the dataset!
                     # f = f.replace(".pgm", ".png")
+
+                    # need  to handle RGB-D or grey_img + disparity
+                    if mini_x.shape[-1] == 1:
+                        mini_x = gray2rgb(mini_x)
+                    elif mini_x.shape[-1] == 2:
+                        mini_x = gray2rgb(mini_x[:, :, 0])
+                    elif mini_x.shape[-1] == 4:
+                        mini_x = mini_x[:, :, :-1]
                     # save Image + GT + prediction
                     im_name = os.path.basename(f)
                     pred_rgb = label2rgb(pred, colors=colormap)
