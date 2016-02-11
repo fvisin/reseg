@@ -2,14 +2,13 @@ from collections import Iterable
 
 import numpy as np
 import lasagne
-from lasagne.layers import get_all_layers, get_output, get_output_shape
+from lasagne.layers import get_output, get_output_shape
 from theano.sandbox.cuda.dnn import GpuDnnConvDesc, GpuDnnConvGradI
 from theano.sandbox.cuda.basic_ops import gpu_contiguous, gpu_alloc_empty
 import theano.tensor as T
 
 from padded import DynamicPaddingLayer, PaddedConv2DLayer as ConvLayer
-from padded import get_equivalent_input_padding
-from utils import ceildiv, to_float, to_int
+from utils import ceildiv, to_int
 
 
 class ReSegLayer(lasagne.layers.Layer):
@@ -204,21 +203,14 @@ class ReSegLayer(lasagne.layers.Layer):
         # Input ConvLayers
         if isinstance(in_nfilters, Iterable) and not isinstance(in_nfilters,
                                                                 str):
-            # Conv2DLayer expects the input to be in bc01 format
-            l_in_conv = lasagne.layers.DimshuffleLayer(
-                l_in,
-                (0, 3, 1, 2),
-                name=self.name + "_input_conv_dimshuffle")
-            self.sublayers.append(l_in_conv)
-
             for i, (nf, f_size, stride) in enumerate(
                     zip(in_nfilters, in_filters_size, in_filters_stride)):
 
                 # TODO: not sure that this is true..
                 # abstract2DConv is working or not?
 
-                l_in_conv = ConvLayer(
-                    l_in_conv,
+                l_in = ConvLayer(
+                    l_in,
                     num_filters=nf,
                     filter_size=f_size,
                     stride=stride,
@@ -227,22 +219,15 @@ class ReSegLayer(lasagne.layers.Layer):
                     pad='valid',
                     name=self.name + '_input_conv_layer' + str(i)
                 )
-                self.sublayers.append(l_in_conv)
+                self.sublayers.append(l_in)
                 self.hypotetical_fm_size = (
                     (self.hypotetical_fm_size - 1) * stride + f_size)
 
                 # Print shape
-                out_shape = get_output_shape(l_in_conv)
+                out_shape = get_output_shape(l_in)
                 out_shape = (out_shape[0], out_shape[2],
                              out_shape[3], out_shape[1])
                 print('RecSeg: After in-convnet: {}'.format(out_shape))
-
-            # Go back to b01c
-            l_in = lasagne.layers.DimshuffleLayer(
-                l_in_conv,
-                (0, 2, 3, 1),
-                name=self.name + "_input_conv_undimshuffle")
-            self.sublayers.append(l_in)
 
         # ReNet layers
         l_renet = l_in
@@ -305,14 +290,8 @@ class ReSegLayer(lasagne.layers.Layer):
             filter_size = to_int(ceildiv((h1 * (h1 - 1) + h2 - h2 * h0),
                                          (h1 - h0)))
 
-            # Convert to 'bc01' format
-            l_upsampling = lasagne.layers.DimshuffleLayer(
-                l_renet,
-                (0, 3, 1, 2),
-                name=self.name + '_grad_dimshuffle')
-            self.sublayers.append(l_upsampling)
-            h0 = get_output(l_upsampling).shape[2:]
-
+            h0 = get_output(l_renet).shape[2:]
+            l_upsampling = l_renet
             for l in range(nlayers):
                 l_upsampling = DeconvLayer(
                     l_upsampling,
@@ -345,20 +324,7 @@ class ReSegLayer(lasagne.layers.Layer):
                 print('Upsample: After grad @ nf: {}, fs: {}, str: {} : {}'.
                       format(out_nfilters[l], filter_size, stride, out_shape))
 
-            l_out = lasagne.layers.DimshuffleLayer(
-                l_upsampling,
-                (0, 2, 3, 1),
-                name=self.name + '_grad_undimshuffle')
-            self.sublayers.append(l_out)
-
         elif out_upsampling_type == 'grad':
-            # DeconvLayer expects the input to be in bc01 format
-            l_upsampling = lasagne.layers.DimshuffleLayer(
-                l_renet,
-                (0, 3, 1, 2),
-                name=self.name + '_grad_dimshuffle')
-            self.sublayers.append(l_upsampling)
-
             for i, (nf, f_size, stride) in enumerate(zip(
                     out_nfilters, out_filters_size, out_filters_stride)):
                 l_upsampling = DeconvLayer(
@@ -379,23 +345,31 @@ class ReSegLayer(lasagne.layers.Layer):
                 print('Upsample: After {}x{} (str {}x{}) @ {}: {}'.format(
                     f_size[0], f_size[1], stride[0], stride[1], nf, out_shape))
 
-            # Go back to b01c
-            l_out = lasagne.layers.DimshuffleLayer(
-                l_upsampling,
+        elif out_upsampling_type == 'linear':
+            # Go to b01c
+            l_upsampling = lasagne.layers.DimshuffleLayer(
+                l_renet,
                 (0, 2, 3, 1),
                 name=self.name + '_grad_undimshuffle')
-            self.sublayers.append(l_out)
+            self.sublayers.append(l_upsampling)
 
-        elif out_upsampling_type == 'linear':
             expand_height = np.prod(pheight)
             expand_width = np.prod(pwidth)
-            l_out = LinearUpsamplingLayer(l_renet,
-                                          expand_height,
-                                          expand_width,
-                                          nclasses,
-                                          name="linear_upsample_layer")
-            self.sublayers.append(l_out)
-        self.l_out = l_out
+            l_upsampling = LinearUpsamplingLayer(l_upsampling,
+                                                 expand_height,
+                                                 expand_width,
+                                                 nclasses,
+                                                 name="linear_upsample_layer")
+            self.sublayers.append(l_upsampling)
+
+            # Go back to bc01
+            l_upsampling = lasagne.layers.DimshuffleLayer(
+                l_upsampling,
+                (0, 3, 1, 2),
+                name=self.name + '_grad_undimshuffle')
+            self.sublayers.append(l_upsampling)
+
+        self.l_out = l_upsampling
 
         # HACK LASAGNE
         # This will set `self.input_layer`, which is needed by Lasagne to find
@@ -468,7 +442,7 @@ class ReNetLayer(lasagne.layers.Layer):
         Parameters
         ----------
         l_in : lasagne.layers.Layer
-            The input layer
+            The input layer, in format batches, channels, rows, cols
         patch_size : tuple
             The size of the patch expressed as (pheight, pwidth).
             Optional
@@ -541,44 +515,43 @@ class ReNetLayer(lasagne.layers.Layer):
         l_in = DynamicPaddingLayer(l_in, patch_size, self.stride,
                                    name=self.name + '_padding')
 
-        # TODO probabilmente dev'essere get_output.shape
-        batch_size, cheight, cwidth, cchannels = get_output_shape(l_in)
+        # get_output(l_in).shape will result in an error in the
+        # recurrent layers
+        batch_size, cchannels, cheight, cwidth = get_output_shape(l_in)
         pheight, pwidth = patch_size
+        psize = pheight * pwidth * cchannels
 
         # Number of patches in each direction
         npatchesH = cheight / pheight
         npatchesW = cwidth / pwidth
 
-        # Split in patches
+        # Split in patches: bs, cc, #H, ph, #W, pw
         l_in = lasagne.layers.ReshapeLayer(
             l_in,
-            (batch_size, npatchesH, pheight, npatchesW, pwidth, cchannels),
-            name=self.name + "_reshape0")
+            (batch_size, cchannels, npatchesH, pheight, npatchesW, pwidth),
+            name=self.name + "_pre_reshape0")
 
+        # #W, #H, bs, cc, ph, pw
         l_in = lasagne.layers.DimshuffleLayer(
             l_in,
-            (0, 1, 3, 2, 4, 5),
-            name=self.name + "_dimshuffle0")
+            (4, 2, 0, 1, 3, 5),
+            name=self.name + "_pre_dimshuffle0")
 
+        # #W, #H, bs, cc * ph * pw
         l_in = lasagne.layers.ReshapeLayer(
             l_in,
-            (batch_size, npatchesH, npatchesW, pheight * pwidth * cchannels),
-            name=self.name + "_reshape1")
+            (npatchesW, npatchesH, batch_size, cchannels * pheight * pwidth),
+            name=self.name + "_pre_reshape1")
 
         # FIRST SUBLAYER
-        # The GRU Layer needs a 3D tensor input
+        # The RNN Layer needs a 3D tensor input: bs*#H, #W, psize
+        # #W, #H*bs, cc * ph * pw
         l_sub0 = lasagne.layers.ReshapeLayer(
             l_in,
-            (batch_size * npatchesH, npatchesW, pheight * pwidth * cchannels),
-            name=self.name + "_sub0_reshape")
+            (npatchesW, npatchesH * batch_size, psize),
+            name=self.name + "_sub0_reshape0")
 
-        # Iterate over columns
-        l_sub0 = lasagne.layers.DimshuffleLayer(
-            l_sub0,
-            (1, 0, 2),
-            name=self.name + "_sub0_dimshuffle")
-
-        # Left/right scan
+        # Left/right scan: #W, #H*bs, 2*hid
         l_sub0 = BidirectionalRNNLayer(
             l_sub0,
             n_hidden,
@@ -604,48 +577,43 @@ class ReNetLayer(lasagne.layers.Layer):
             rnn_b=rnn_b,
             name=self.name + "_sub0_renetsub")
 
-        # Revert dimshuffle
-        l_sub0 = lasagne.layers.DimshuffleLayer(
-            l_sub0,
-            (1, 0, 2),
-            name=self.name + "_sub0_undimshuffle")
-
-        # Revert reshape
+        # Revert reshape: #W, #H, bs, 2*hid
         l_sub0 = lasagne.layers.ReshapeLayer(
             l_sub0,
-            (batch_size, npatchesH, npatchesW, 2 * n_hidden),
+            (npatchesW, npatchesH, batch_size, 2*n_hidden),
             name=self.name + "_sub0_unreshape")
+
+        # Invert rows and columns: #H, #W, bs, psize
+        l_sub0 = lasagne.layers.DimshuffleLayer(
+            l_sub0,
+            (1, 0, 2, 3),
+            name=self.name + "_sub0_undimshuffle")
 
         # If stack_sublayers is True, the second sublayer takes as an input the
         # first sublayer's output, otherwise the input of the ReNetLayer (e.g
         # the image)
         if stack_sublayers:
+            # #H, #W, bs, 2*hid
             input_sublayer1 = l_sub0
-            cchannels = 2 * n_hidden
+            psize = 2 * n_hidden
         else:
+            # #W, #H, bs, psize
             input_sublayer1 = l_in
-            # cchannels = cchannels * pwidth * pheight
+
+            # Invert rows and columns: #H, #W, bs, psize
+            input_sublayer1 = lasagne.layers.DimshuffleLayer(
+                input_sublayer1,
+                (1, 0, 2, 3),
+                name=self.name + "_presub1_in_dimshuffle")
 
         # SECOND SUBLAYER
-        # Invert rows and columns
-        l_sub1 = lasagne.layers.DimshuffleLayer(
-            input_sublayer1,
-            (0, 2, 1, 3),
-            name=self.name + "_sub1_dimshuffle0")
-
-        # The GRU Layer needs a 3D tensor input
+        # The RNN Layer needs a 3D tensor input: #H, #W*bs, psize
         l_sub1 = lasagne.layers.ReshapeLayer(
-            l_sub1,
-            (batch_size * npatchesW, npatchesH, cchannels),
+            input_sublayer1,
+            (npatchesH, npatchesW * batch_size, psize),
             name=self.name + "_sub1_reshape")
 
-        # Iterate over rows
-        l_sub1 = lasagne.layers.DimshuffleLayer(
-            l_sub1,
-            (1, 0, 2),
-            name=self.name + "_sub1_dimshuffle1")
-
-        # Down/up scan
+        # Down/up scan: #H, #W*bs, 2*hid
         l_sub1 = BidirectionalRNNLayer(
             l_sub1,
             n_hidden,
@@ -671,31 +639,21 @@ class ReNetLayer(lasagne.layers.Layer):
             rnn_b=rnn_b,
             name=self.name + "_sub1_renetsub")
 
-        # Revert the last dimshuffle
-        l_sub1 = lasagne.layers.DimshuffleLayer(
-            l_sub1,
-            (1, 0, 2),
-            name=self.name + "_sub1_undimshuffle1")
-
-        # Revert the reshape
+        # Revert the reshape: #H, #W, bs, 2*hid
         l_sub1 = lasagne.layers.ReshapeLayer(
             l_sub1,
-            (batch_size, npatchesW, npatchesH, 2 * n_hidden),
+            (npatchesH, npatchesW, batch_size, 2*n_hidden),
             name=self.name + "_sub1_unreshape")
 
-        # Revert the other dimshuffle
-        l_sub1 = lasagne.layers.DimshuffleLayer(
-            l_sub1,
-            (0, 2, 1, 3),
-            name=self.name + "_sub1_undimshuffle0")
+        # Concat all 4 layers if needed: #H, #W, bs, {2,4}*hid
+        if not stack_sublayers:
+            l_sub1 = lasagne.layers.ConcatLayer([l_sub0, l_sub1], axis=3)
 
-        # Set out_layer and out_shape
-        if stack_sublayers:
-            self.out_layer = l_sub1
-        else:
-            self.out_layer = lasagne.layers.ConcatLayer(
-                [l_sub0, l_sub1],
-                axis=3)
+        # Get back to bc01
+        self.out_layer = lasagne.layers.DimshuffleLayer(
+            l_sub1,
+            (2, 3, 0, 1),
+            name=self.name + "_out_undimshuffle")
 
         # HACK LASAGNE
         # This will set `self.input_layer`, which is needed by Lasagne to find
@@ -716,7 +674,7 @@ class ReNetLayer(lasagne.layers.Layer):
         else:
             dim = 4 * self.n_hidden
 
-        return input_shape[0], npatchesH, npatchesW, dim
+        return input_shape[0], dim, npatchesH, npatchesW
 
     def get_output_for(self, input_var, **kwargs):
         # HACK LASAGNE
@@ -1068,7 +1026,7 @@ class DeconvLayer(lasagne.layers.Layer):
         self.pad = (0, 0)
 
         n_in_channels = self.input_shape[1]
-        W_shape = [n_in_channels, num_filters] + list(self.filter_size)
+        W_shape = (n_in_channels, num_filters) + tuple(self.filter_size)
         self.W = self.add_param(W, W_shape, name="W")
         if b is None:
             self.b = None
@@ -1162,7 +1120,7 @@ def get_deconv_size(input_size, filter_size, stride, pad):
 
 
 class CropLayer(lasagne.layers.Layer):
-    def __init__(self, l_in, crop, data_format='b01c', centered=True,
+    def __init__(self, l_in, crop, data_format='bc01', centered=True,
                  **kwargs):
         super(CropLayer, self).__init__(l_in, crop, **kwargs)
         assert data_format in ['bc01', 'b01c']

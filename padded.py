@@ -153,7 +153,7 @@ class DynamicPaddingLayer(Layer):
             l_in,
             patch_size,
             stride,
-            data_format='b01c',
+            data_format='bc01',
             name='',
             **kwargs):
         """A Layer that zero-pads the input
@@ -190,7 +190,7 @@ class DynamicPaddingLayer(Layer):
                               self.data_format, True)
 
 
-def zero_pad(input_arr, patch_size, stride, data_format='b01c'):
+def zero_pad(input_arr, patch_size, stride, data_format='bc01'):
     assert data_format in ['bc01', 'b01c']
 
     if data_format == 'b01c':

@@ -98,6 +98,10 @@ def buildReSeg(input_shape, input_var,
     l_in = lasagne.layers.InputLayer(shape=input_shape,
                                      input_var=input_var,
                                      name="input_layer")
+
+    # Convert to batchsize, ch, rows, cols
+    l_in = lasagne.layers.DimshuffleLayer(l_in, (0, 3, 1, 2))
+
     # To know the upsampling ratio we compute what is the feature map
     # size at the end of the downsampling pathway for an hypotetical
     # initial size of 100 (we just need the ratio, so we don't care
@@ -108,12 +112,9 @@ def buildReSeg(input_shape, input_var,
     # Pretrained vgg16
     if in_nfilters == 'vgg':
         from vgg16 import buildVgg16
-        # Convert to batchsize, ch, rows, cols
-        l_conv = lasagne.layers.DimshuffleLayer(l_conv, (0, 3, 1, 2))
-        l_vgg16 = buildVgg16(l_conv, 'conv3_3', False)
-        # Back to batchsize, rows, cols, ch
-        l_conv = lasagne.layers.DimshuffleLayer(l_vgg16, (0, 2, 3, 1))
+        l_vgg16 = buildVgg16(l_in, 'conv3_3', False)
         hypotetical_fm_size /= 4
+        l_conv = l_vgg16
 
     l_reseg = ReSegLayer(l_conv, n_layers, pheight, pwidth, dim_proj,
                          nclasses, stack_sublayers,
@@ -158,10 +159,16 @@ def buildReSeg(input_shape, input_var,
 
     # Crop
     # TODO DO we need it?
-    target_size = get_output(l_in).shape[1:3]
-    crop = get_output(l_reseg).shape[1:3] - target_size
+    target_size = get_output(l_in).shape[2:]
+    crop = get_output(l_reseg).shape[2:] - target_size
     # crop = get_equivalent_input_padding(l_reseg)
     l_out = CropLayer(l_reseg, crop, centered=False)
+
+    # Go to b01c
+    l_out = lasagne.layers.DimshuffleLayer(
+        l_out,
+        [0, 2, 3, 1],
+        name='dimshuffle_before_softmax')
 
     # Reshape in 2D, last dimension is nclasses, where the softmax is applied
     l_out_shape = get_output(l_out).shape
