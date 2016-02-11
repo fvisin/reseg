@@ -14,7 +14,7 @@ class PaddedConv2DLayer(Conv2DLayer):
                  pad=0, untie_biases=False, W=init.GlorotUniform(),
                  b=init.Constant(0.), nonlinearity=nonlinearities.rectify,
                  flip_filters=True, convolution=theano.tensor.nnet.conv2d,
-                 **kwargs):
+                 centered=True, **kwargs):
         """A padded convolutional layer
 
         Note
@@ -48,10 +48,14 @@ class PaddedConv2DLayer(Conv2DLayer):
             See :class:``lasagne.layers.Conv2DLayer``
         convolution : callable
             See :class:``lasagne.layers.Conv2DLayer``
+        centered : bool
+            If True, the padding will be added on both sides. If False
+            the zero padding will be applied on the upper left side.
         **kwargs
             Any additional keyword arguments are passed to the
             :class:``lasagne.layers.Layer`` superclass
         """
+        self.centered = centered
         if pad not in [0, (0, 0), [0, 0]]:
             warnings.warn('The specified padding will be ignored',
                           RuntimeWarning)
@@ -67,7 +71,7 @@ class PaddedConv2DLayer(Conv2DLayer):
     def get_output_for(self, input_arr, **kwargs):
         # Compute the padding required not to crop any pixel
         input_arr, pad = zero_pad(
-            input_arr, self.filter_size, self.stride, 'bc01')
+            input_arr, self.filter_size, self.stride, self.centered, 'bc01')
 
         # Erase self.pad to prevent theano from padding the input
         self.pad = 0
@@ -91,7 +95,7 @@ class PaddedConv2DLayer(Conv2DLayer):
 
 class PaddedPool2DLayer(Pool2DLayer):
     def __init__(self, incoming, pool_size, stride=None, pad=(0, 0),
-                 ignore_border=True, **kwargs):
+                 ignore_border=True, centered=True, **kwargs):
         """A padded pooling layer
 
         Parameters
@@ -107,10 +111,14 @@ class PaddedPool2DLayer(Pool2DLayer):
             :class:``lasagne.layers.Pool2DLayer``
         ignore_border : bool
             See :class:``lasagne.layers.Pool2DLayer``
+        centered : bool
+            If True, the padding will be added on both sides. If False
+            the zero padding will be applied on the upper left side.
         **kwargs
             Any additional keyword arguments are passed to the Layer
             superclass
         """
+        self.centered = centered
         if pad not in [0, (0, 0), [0, 0]]:
             warnings.warn('The specified padding will be ignored',
                           RuntimeWarning)
@@ -127,7 +135,7 @@ class PaddedPool2DLayer(Pool2DLayer):
     def get_output_for(self, input_arr, **kwargs):
         # Compute the padding required not to crop any pixel
         input_arr, pad = zero_pad(
-            input_arr, self.pool_size, self.stride, 'bc01')
+            input_arr, self.pool_size, self.stride, self.centered, 'bc01')
         # Erase self.pad to prevent theano from padding the input
         self.pad = 0
         ret = super(PaddedConv2DLayer, self).convolve(input_arr, **kwargs)
@@ -154,6 +162,7 @@ class DynamicPaddingLayer(Layer):
             patch_size,
             stride,
             data_format='bc01',
+            centered=True,
             name='',
             **kwargs):
         """A Layer that zero-pads the input
@@ -169,6 +178,9 @@ class DynamicPaddingLayer(Layer):
         data_format : string
             The format of l_in, either `b01c` (batch, rows, cols,
             channels) or `bc01` (batch, channels, rows, cols)
+        centered : bool
+            If True, the padding will be added on both sides. If False
+            the zero padding will be applied on the upper left side.
         name = string
             The name of the layer, optional
         """
@@ -177,11 +189,13 @@ class DynamicPaddingLayer(Layer):
         self.patch_size = patch_size
         self.stride = stride
         self.data_format = data_format
+        self.centered = centered
         self.name = name
 
     def get_output_for(self, input_arr, **kwargs):
         input_arr, pad = zero_pad(
-            input_arr, self.patch_size, self.stride, self.data_format)
+            input_arr, self.patch_size, self.stride, self.centered,
+            self.data_format)
         self.pad = pad
         return input_arr
 
@@ -190,7 +204,7 @@ class DynamicPaddingLayer(Layer):
                               self.data_format, True)
 
 
-def zero_pad(input_arr, patch_size, stride, data_format='bc01'):
+def zero_pad(input_arr, patch_size, stride, centered=True, data_format='bc01'):
     assert data_format in ['bc01', 'b01c']
 
     if data_format == 'b01c':
@@ -204,27 +218,63 @@ def zero_pad(input_arr, patch_size, stride, data_format='bc01'):
     # TODO improve efficiency by allocating the full array of zeros and
     # setting the subtensor afterwards
     if data_format == 'bc01':
-        input_arr = ifelse(
-            T.eq(pad[0], 0),
-            input_arr,
-            T.concatenate((T.zeros_like(input_arr[:, :, 0:pad[0], :]),
-                           input_arr), 2))
-        input_arr = ifelse(
-            T.eq(pad[1], 0),
-            input_arr,
-            T.concatenate((T.zeros_like(input_arr[:, :, :, 0:pad[1]]),
-                           input_arr), 3))
+        if centered:
+            input_arr = ifelse(
+                T.eq(pad[0], 0),
+                input_arr,
+                T.concatenate(
+                    (T.zeros_like(input_arr[:, :, :pad[0]/2, :]),
+                     input_arr,
+                     T.zeros_like(input_arr[:, :, :pad[0] - pad[0]/2, :])),
+                    2))
+            input_arr = ifelse(
+                T.eq(pad[1], 0),
+                input_arr,
+                T.concatenate(
+                    (T.zeros_like(input_arr[:, :, :, :pad[1]/2]),
+                     input_arr,
+                     T.zeros_like(input_arr[:, :, :, :pad[1] - pad[1]/2])),
+                    3))
+        else:
+            input_arr = ifelse(
+                T.eq(pad[0], 0),
+                input_arr,
+                T.concatenate((T.zeros_like(input_arr[:, :, :pad[0], :]),
+                               input_arr), 2))
+            input_arr = ifelse(
+                T.eq(pad[1], 0),
+                input_arr,
+                T.concatenate((T.zeros_like(input_arr[:, :, :, :pad[1]]),
+                               input_arr), 3))
     else:
-        input_arr = ifelse(
-            T.eq(pad[0], 0),
-            input_arr,
-            T.concatenate((T.zeros_like(input_arr[:, 0:pad[0], :, :]),
-                           input_arr), 1))
-        input_arr = ifelse(
-            T.eq(pad[1], 0),
-            input_arr,
-            T.concatenate((T.zeros_like(input_arr[:, :, 0:pad[1], :]),
-                           input_arr), 2))
+        if centered:
+            input_arr = ifelse(
+                T.eq(pad[0], 0),
+                input_arr,
+                T.concatenate(
+                    (T.zeros_like(input_arr[:, :pad[0]/2, :, :]),
+                     input_arr,
+                     T.zeros_like(input_arr[:, :pad[0] - pad[0]/2, :, :])),
+                    1))
+            input_arr = ifelse(
+                T.eq(pad[1], 0),
+                input_arr,
+                T.concatenate(
+                    (T.zeros_like(input_arr[:, :, :pad[1]/2, :]),
+                     input_arr,
+                     T.zeros_like(input_arr[:, :, :pad[1] - pad[1]/2, :])),
+                    2))
+        else:
+            input_arr = ifelse(
+                T.eq(pad[0], 0),
+                input_arr,
+                T.concatenate((T.zeros_like(input_arr[:, :pad[0], :, :]),
+                               input_arr), 1))
+            input_arr = ifelse(
+                T.eq(pad[1], 0),
+                input_arr,
+                T.concatenate((T.zeros_like(input_arr[:, :, :pad[1], :]),
+                               input_arr), 2))
     return input_arr, pad
 
 

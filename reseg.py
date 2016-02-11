@@ -611,16 +611,6 @@ def train(saveto='model.npz',
             x_tag = np.expand_dims(x_tag, 0)
             y_tag = np.expand_dims(y_tag, 0)
 
-        # TODO Do we need it? Reason about this
-        # crop the image if it is not a multiple of the patch size
-        if 'linear' in out_upsampling:
-            dh = x_tag.shape[1] % np.prod(pheight)
-            dw = x_tag.shape[2] % np.prod(pwidth)
-            x_tag = x_tag[:, dh/2:(-dh+dh/2 if -dh+dh/2 else None),
-                          dw/2:(-dw+dw/2 if -dw/dw/2 else None), ...]
-            y_tag = y_tag[:, dh/2:(-dh+dh/2 if -dh+dh/2 else None),
-                          dw/2:(-dw+dw/2 if -dw/dw/2 else None), ...]
-
         input_var.tag.test_value = x_tag
         target_var.tag.test_value = y_tag.flatten()
         theano.config.compute_test_value = 'warn'
@@ -715,16 +705,6 @@ def train(saveto='model.npz',
             inputs = (inputs / 255.).astype(floatX)
             targets = targets.astype(intX)
             targets_flat = targets.flatten()
-
-            # TODO Move to preprocessing fn
-            # crop if not a multiple of the patch size
-            if 'linear' in out_upsampling:
-                dh = inputs.shape[1] % np.prod(options['pheight'])
-                dw = inputs.shape[2] % np.prod(options['pwidth'])
-                inputs = inputs[:, dh/2:(-dh+dh/2 if -dh+dh/2 else None),
-                                dw/2:(-dw+dw/2 if -dw/dw/2 else None), ...]
-                targets = targets[:, dh/2:(-dh+dh/2 if -dh+dh/2 else None),
-                                  dw/2:(-dw+dw/2 if -dw/dw/2 else None), ...]
 
             if np.mod(uidx, dispFreq) == 0:
                 print 'Image size: {}'.format(inputs.shape)
