@@ -1090,7 +1090,7 @@ def get_deconv_size(input_size, filter_size, stride, pad):
         return None
 
     if isinstance(pad, (int, Iterable)) and not isinstance(pad, str):
-        output_size = (input_size + 2*pad - 1) * stride + filter_size
+        output_size = (input_size - 1) * stride + filter_size - 2*pad
     elif pad == 'full':
         output_size = input_size * stride - filter_size - stride + 2
     elif pad == 'valid':
