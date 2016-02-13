@@ -669,8 +669,8 @@ class ReNetLayer(lasagne.layers.Layer):
 
     def get_output_shape_for(self, input_shape):
         pheight, pwidth = self.patch_size
-        npatchesH = ceildiv(input_shape[1], pheight)
-        npatchesW = ceildiv(input_shape[2], pwidth)
+        npatchesH = ceildiv(input_shape[2], pheight)
+        npatchesW = ceildiv(input_shape[3], pwidth)
 
         if self.stack_sublayers:
             dim = 2 * self.n_hidden
