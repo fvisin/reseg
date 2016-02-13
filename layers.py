@@ -304,6 +304,12 @@ class ReSegLayer(lasagne.layers.Layer):
                 self.sublayers.append(l_upsampling)
                 h1 = get_output(l_upsampling).shape[2:]
 
+                # Print shape
+                out_shape = get_output_shape(l_upsampling)
+                print('Autograd: {}x{} (str {}x{}) @ {}:' +
+                      '{}'.format(filter_size[0], filter_size[1], stride[0],
+                                  stride[1], out_nfilters[l], out_shape))
+
                 # CROP
                 # upsampled_size = np.array(to_float(
                 #    np.array(get_all_layers(l_renet)[0].shape[1:3]) +
@@ -320,9 +326,7 @@ class ReSegLayer(lasagne.layers.Layer):
 
                 # Print shape
                 out_shape = get_output_shape(l_upsampling)
-                out_shape = [out_shape[i] for i in [0, 2, 3, 1]]
-                print('Upsample: After grad @ nf: {}, fs: {}, str: {} : {}'.
-                      format(out_nfilters[l], filter_size, stride, out_shape))
+                print('Dynamic cropping')
 
         elif out_upsampling_type == 'grad':
             for i, (nf, f_size, stride) in enumerate(zip(
@@ -341,8 +345,7 @@ class ReSegLayer(lasagne.layers.Layer):
 
                 # Print shape
                 out_shape = get_output_shape(l_upsampling)
-                out_shape = [out_shape[i] for i in [0, 2, 3, 1]]
-                print('Upsample: After {}x{} (str {}x{}) @ {}: {}'.format(
+                print('Grad: {}x{} (str {}x{}) @ {}: {}'.format(
                     f_size[0], f_size[1], stride[0], stride[1], nf, out_shape))
 
         elif out_upsampling_type == 'linear':
