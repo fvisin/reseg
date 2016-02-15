@@ -61,6 +61,8 @@ class ReSegLayer(lasagne.layers.Layer):
                  rnn_W_in_to_hid=lasagne.init.Uniform(),
                  rnn_W_hid_to_hid=lasagne.init.Uniform(),
                  rnn_b=lasagne.init.Constant(0.),
+                 # Special layers
+                 batch_norm=False,
                  name=''):
         """A ReSeg layer
 
@@ -147,6 +149,8 @@ class ReSegLayer(lasagne.layers.Layer):
         rnn_b : Theano shared variable, numpy array, callable or None
             Initializer for bias vector, if RecurrentNet is
             RecurrentLaye. If None is provided there will be no bias
+        batch_norm: this add a batch normalization layer at the end of the
+            network right after each Gradient Upsampling layers
         name : string
             The name of the layer, optional
         """
@@ -253,6 +257,7 @@ class ReSegLayer(lasagne.layers.Layer):
                                  rnn_W_in_to_hid=rnn_W_in_to_hid,
                                  rnn_W_hid_to_hid=rnn_W_hid_to_hid,
                                  rnn_b=rnn_b,
+                                 batch_norm=batch_norm,
                                  name=self.name + '_renet' + str(lidx))
             self.sublayers.append(l_renet)
             self.hypotetical_fm_size /= (pwidth[lidx], pheight[lidx])
@@ -334,10 +339,23 @@ class ReSegLayer(lasagne.layers.Layer):
                     nonlinearity=out_nonlinearity)
                 self.sublayers.append(l_upsampling)
 
+                if batch_norm:
+                    l_upsampling = lasagne.layers.batch_norm(
+                        l_upsampling,
+                        axes='auto',
+                        epsilon=1e-4,
+                        alpha=0.1,
+                        mode='low_mem',
+                        beta=lasagne.init.Constant(0),
+                        gamma=lasagne.init.Constant(1),
+                        mean=lasagne.init.Constant(0),
+                        inv_std=lasagne.init.Constant(1))
+                    self.sublayers.append(l_upsampling)
+
                 # Print shape
                 out_shape = get_output_shape(l_upsampling)
-                print('Transposed grad: {}x{} (str {}x{}) @ {}: {}'.format(
-                    f_size[0], f_size[1], stride[0], stride[1], nf, out_shape))
+                if batch_norm:
+                    print "Batch normalization after Grad layer "
 
         elif out_upsampling_type == 'linear':
             # Go to b01c
@@ -353,8 +371,24 @@ class ReSegLayer(lasagne.layers.Layer):
                                                  expand_height,
                                                  expand_width,
                                                  nclasses,
+                                                 batch_norm=batch_norm,
                                                  name="linear_upsample_layer")
             self.sublayers.append(l_upsampling)
+
+            if batch_norm:
+                l_upsampling = lasagne.layers.batch_norm(
+                    l_upsampling,
+                    axes=(0, 1, 2),
+                    epsilon=1e-4,
+                    alpha=0.1,
+                    mode='low_mem',
+                    beta=lasagne.init.Constant(0),
+                    gamma=lasagne.init.Constant(1),
+                    mean=lasagne.init.Constant(0),
+                    inv_std=lasagne.init.Constant(1))
+
+                self.sublayers.append(l_upsampling)
+                print "Batch normalization after Linear upsampling layer "
 
             # Go back to bc01
             l_upsampling = lasagne.layers.DimshuffleLayer(
@@ -421,6 +455,7 @@ class ReNetLayer(lasagne.layers.Layer):
                  rnn_W_in_to_hid=lasagne.init.Uniform(),
                  rnn_W_hid_to_hid=lasagne.init.Uniform(),
                  rnn_b=lasagne.init.Constant(0.),
+                 batch_norm=False,
                  name='', **kwargs):
         """A ReNet layer
 
@@ -563,6 +598,7 @@ class ReNetLayer(lasagne.layers.Layer):
             gru_updategate=gru_updategate,
             gru_hidden_update=gru_hidden_update,
             gru_hid_init=gru_hid_init,
+            batch_norm=batch_norm,
             # LSTM specific params
             lstm_ingate=lstm_ingate,
             lstm_forgetgate=lstm_forgetgate,
@@ -702,6 +738,7 @@ class BidirectionalRNNLayer(lasagne.layers.Layer):
                 W_cell=None,
                 nonlinearity=lasagne.nonlinearities.tanh),
             gru_hid_init=lasagne.init.Constant(0.),
+            batch_norm=False,
             # LSTM specific params
             lstm_ingate=lasagne.layers.Gate(),
             lstm_forgetgate=lasagne.layers.Gate(),
@@ -785,6 +822,9 @@ class BidirectionalRNNLayer(lasagne.layers.Layer):
 
         # GRU
         if RecurrentNet.__name__ == 'GRULayer':
+            if batch_norm:
+                RecurrentNet = lasagne.layers.BNGRULayer
+
             rnn_params = dict(
                 resetgate=gru_resetgate,
                 updategate=gru_updategate,
@@ -864,6 +904,7 @@ class LinearUpsamplingLayer(lasagne.layers.Layer):
                  nclasses,
                  W=lasagne.init.Normal(0.01),
                  b=lasagne.init.Constant(.0),
+                 batch_norm=False,
                  **kwargs):
         super(LinearUpsamplingLayer, self).__init__(incoming, **kwargs)
         nfeatures_in = self.input_shape[-1]
@@ -874,13 +915,18 @@ class LinearUpsamplingLayer(lasagne.layers.Layer):
         self.expand_height = expand_height
         self.expand_width = expand_width
         self.nclasses = nclasses
+        self.batch_norm = batch_norm
+
         # ``regularizable`` and ``trainable`` by default
         self.W = self.add_param(W, (nfeatures_in, nfeatures_out), name='W')
-        self.b = self.add_param(b, (nfeatures_out,), name='b')
+        if not batch_norm:
+            self.b = self.add_param(b, (nfeatures_out,), name='b')
 
     def get_output_for(self, input_arr, **kwargs):
         # upsample
-        pred = T.dot(input_arr, self.W) + self.b
+        pred = T.dot(input_arr, self.W)
+        if not self.batch_norm:
+            pred += self.b
 
         nrows, ncolumns = self.input_shape[1:3]
         batch_size = -1

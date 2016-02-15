@@ -97,7 +97,10 @@ def buildReSeg(input_shape, input_var,
                # RNN specific params
                rnn_W_in_to_hid=lasagne.init.Uniform(),
                rnn_W_hid_to_hid=lasagne.init.Uniform(),
-               rnn_b=lasagne.init.Constant(0.)):
+               rnn_b=lasagne.init.Constant(0.),
+               # Special layer
+               batch_norm=False
+               ):
     '''Helper function to build a ReSeg network'''
 
     print('Input shape: ' + str(input_shape))
@@ -161,6 +164,8 @@ def buildReSeg(input_shape, input_var,
                          rnn_W_in_to_hid=rnn_W_in_to_hid,
                          rnn_W_hid_to_hid=rnn_W_hid_to_hid,
                          rnn_b=rnn_b,
+                         # Special layers
+                         batch_norm=batch_norm,
                          name='reseg')
 
     # Crop
@@ -201,7 +206,8 @@ def buildReSeg(input_shape, input_var,
 
 
 def getFunctions(input_var, target_var, class_balance_w_var, l_pred,
-                 weight_decay=0., optimizer=lasagne.updates.adadelta,
+                 batch_norm=False, weight_decay=0.,
+                 optimizer=lasagne.updates.adadelta,
                  learning_rate=None, momentum=None,
                  rho=None, beta1=None, beta2=None, epsilon=None, ):
     '''Helper function to build the training function
@@ -217,6 +223,16 @@ def getFunctions(input_var, target_var, class_balance_w_var, l_pred,
 
     # Compute the loss to be minimized during training
     prediction = lasagne.layers.get_output(l_pred)
+
+    batch_norm_params = dict()
+    if batch_norm:
+        batch_norm_params.update(
+            dict(batch_norm_update_averages=True))
+        batch_norm_params.update(
+            dict(batch_norm_use_averages=False))
+
+    prediction = lasagne.layers.get_output(l_pred,
+                                           **batch_norm_params)
     loss = lasagne.objectives.categorical_crossentropy(
         prediction, target_var)
 
@@ -611,9 +627,12 @@ def train(saveto='model.npz',
     # Compute the indexes of the images to be saved
     if isinstance(n_save, collections.Iterable):
         samples_ids = np.array(n_save)
-    elif isinstance(n_save, int):
-        list_n = [random.sample(len(s), min(len(s), n_save)) for s in 
-                  [train[0], valid[0], test[0]]]
+    elif n_save != -1:
+        samples_ids = [
+            random.sample(range(len(s)), min(len(s), n_save)) for s in
+            [train[0], valid[0], test[0]]]
+    else:
+        samples_ids = [range(len(s)) for s in [train[0], valid[0], test[0]]]
     options['samples_ids'] = samples_ids
 
     # Retrieve basic size informations and split train variables
@@ -731,11 +750,15 @@ def train(saveto='model.npz',
                        # RNN specific params
                        rnn_W_in_to_hid=rnn_W_in_to_hid,
                        rnn_W_hid_to_hid=rnn_W_hid_to_hid,
-                       rnn_b=rnn_b)
-    f_pred, f_train = getFunctions(
-        input_var, target_var, class_balance_w_var, l_out, weight_decay,
-        optimizer=optimizer, learning_rate=learning_rate, momentum=momentum,
-        rho=rho, beta1=beta1, beta2=beta2, epsilon=epsilon)
+                       rnn_b=rnn_b,
+                       # special layers
+                       batch_norm=batch_norm)
+
+    f_pred, f_train = getFunctions(input_var, target_var, class_balance_w_var,
+                                   l_out, weight_decay, optimizer=optimizer,
+                                   learning_rate=learning_rate,
+                                   momentum=momentum, rho=rho, beta1=beta1,
+                                   beta2=beta2, epsilon=epsilon)
 
     # Reload the list of the value parameters
     # TODO Check if the saved params are CudaNDArrays or not, so that we
@@ -787,10 +810,9 @@ def train(saveto='model.npz',
 
             # TODO: preprocess function
             # whiten, LCN, GCN, Local Mean Subtract, or normalize
-            x, y = preprocess(inputs,
-                              options['preprocess_type'],
-                              patch_size, max_patches)
-
+            x = preprocess(inputs,
+                           preprocess_type,
+                           patch_size, max_patches)
             dd = time.time() - st
             st = time.time()
 
@@ -822,7 +844,7 @@ def train(saveto='model.npz',
                                                   train,
                                                   valid_batch_size,
                                                   nclasses,
-                                                  samples_ids=samples_ids,
+                                                  samples_ids=samples_ids[0],
                                                   filenames=filenames_train,
                                                   folder_dataset='train',
                                                   dataset=dataset,
@@ -835,7 +857,7 @@ def train(saveto='model.npz',
                                                   valid,
                                                   valid_batch_size,
                                                   nclasses,
-                                                  samples_ids=samples_ids,
+                                                  samples_ids=samples_ids[1],
                                                   filenames=filenames_valid,
                                                   folder_dataset='valid',
                                                   dataset=dataset,
@@ -848,7 +870,7 @@ def train(saveto='model.npz',
                                                  test,
                                                  valid_batch_size,
                                                  nclasses,
-                                                 samples_ids=samples_ids,
+                                                 samples_ids=samples_ids[2],
                                                  filenames=filenames_test,
                                                  folder_dataset='test',
                                                  dataset=dataset,
