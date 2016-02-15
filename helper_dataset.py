@@ -165,6 +165,43 @@ def save_RGB_mask(outpath, mask):
     return
 
 
+def preprocess(x, mode=None,
+               patch_size=9,
+               max_patches=int(1e5)):
+    """
+
+    :param x:
+    :param mode:
+    :param rng:
+    :param patch_size:
+    :param max_patches:
+    :return:
+    """
+
+    if mode == 'conv-zca':
+        x = convolutional_zca(x,
+                              patch_size=patch_size,
+                              max_patches=max_patches)
+    elif mode == 'sub-lcn':
+        for d in range(x.shape[-1]):
+            x[:, :, :, d] = lecun_lcn(x[:, :, :, d],
+                                      kernel_size=patch_size)
+    elif mode == 'subdiv-lcn':
+        for d in range(x.shape[-1]):
+            x[:, :, :, d] = lecun_lcn(x[:, :, :, d],
+                                      kernel_size=patch_size,
+                                      use_divisor=True)
+    elif mode == 'gcn':
+        for d in range(x.shape[-1]):
+            x[:, :, :, d] = global_contrast_normalization(x[:, :, :, d])
+    elif mode == 'local_mean_sub':
+        for d in range(x.shape[-1]):
+            x[:, :, :, d] = local_mean_subtraction(x[:, :, :, d],
+                                                   kernel_size=patch_size)
+    x = x.astype(floatX)
+    return x
+
+
 def lecun_lcn(input, kernel_size=9, threshold=1e-4, use_divisor=False):
     """
     Yann LeCun's local contrast normalization
@@ -331,7 +368,7 @@ def convolutional_zca(input, patch_size=(9, 9), max_patches=int(1e5)):
 
     :return: conv-zca whitened dataset
     """
-
+    patch_size = (patch_size, patch_size)
     # I don't know if it's correct or not.. but it seems to work
     mean = np.mean(input, axis=(0, 1, 2))
     input -= mean  # center the data

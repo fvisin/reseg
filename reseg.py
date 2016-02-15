@@ -19,6 +19,7 @@ from theano import tensor as T
 from theano.compile.nanguardmode import NanGuardMode
 
 # Local application/library specific imports
+from helper_dataset import preprocess
 from config_datasets import colormap_datasets
 from get_info_model import print_params
 from layers import CropLayer, ReSegLayer
@@ -785,15 +786,10 @@ def train(saveto='model.npz',
             targets_flat = targets.flatten()
 
             # TODO: preprocess function
-            # whiten, LCN, GCN, Local Mean Subtract, or normalize +
-            # stochastically augment data
-            # x, y = preprocess(x,
-            #                   options['color'], mean, std,
-            #                   options['preprocess_type'],
-            #                   y, rng, do_random_flip,
-            #                   do_random_shift, do_random_invert_color,
-            #                   options['reorder'], options['shift_pixels'],
-            #                   patch_size, max_patches)
+            # whiten, LCN, GCN, Local Mean Subtract, or normalize
+            x, y = preprocess(inputs,
+                              options['preprocess_type'],
+                              patch_size, max_patches)
 
             dd = time.time() - st
             st = time.time()
