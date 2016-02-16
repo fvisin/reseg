@@ -15,7 +15,6 @@ except:
 
 import lasagne
 import lasagne.layers
-import lasagne.layers.dnn
 from lasagne.layers import InputLayer, DenseLayer, NonlinearityLayer
 from lasagne.nonlinearities import softmax
 from padded import PaddedConv2DLayer
@@ -29,7 +28,10 @@ def buildVgg16(l_in=InputLayer((None, 3, 224, 224)), get_layer='prob',
         ConvLayer = PaddedConv2DLayer
         PoolLayer = PaddedPool2DLayer
     else:
-        ConvLayer = lasagne.layers.dnn.Conv2DDNNLayer
+        try:
+            ConvLayer = lasagne.layers.dnn.Conv2DDNNLayer
+        except AttributeError:
+            ConvLayer = lasagne.layers.Conv2DLayer
         PoolLayer = lasagne.layers.Pool2DLayer
 
     net = OrderedDict()
