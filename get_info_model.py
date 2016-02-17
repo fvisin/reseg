@@ -35,7 +35,9 @@ def print_params(fp, print_commit_hash=False, plot=False,
     """
     dataset = fp.get("dataset", "camvid")
 
-    errs = numpy.array(fp['history_acc'])
+    errs = fp.get('history_acc', None)
+    if errs is None:
+        errs = fp.get('history_errs', None)
     conf_matrices = numpy.array(fp['history_conf_matrix'])
     iou_indeces = numpy.array(fp['history_iou_index'])
     nclasses = conf_matrices.shape[2] if len(conf_matrices) > 0 else -1
@@ -67,91 +69,99 @@ def print_params(fp, print_commit_hash=False, plot=False,
     else:
         huc = None
 
-    fp['optimizer'] = lasagne.updates.adadelta
+    # GRU specific fp
+    rnn_params = ' '
+    if fp['RecurrentNet'].__name__ == 'GRULayer':
+        rnn_params = ' '.join((fp['gru_resetgate'].__class__.__name__,
+                               fp['gru_updategate'].__class__.__name__,
+                               fp['gru_hidden_update'].__class__.__name__,
+                               fp['gru_hid_init'].__class__.__name__,
+                               str(fp['gru_hid_init'].val)))
+    # LSTM specific fp
+    if fp['RecurrentNet'].__name__ == 'LSTMLayer':
+
+        rnn_params = ' '.join((fp['lstm_ingate'].__class__.__name__,
+                               fp['lstm_forgetgate'].__class__.__name__,
+                               fp['lstm_cell'].__class__.__name__,
+                               fp['lstm_outgate'].__class__.__name__))
+    # RNN specific fp
+    if fp['RecurrentNet'].__name__ == 'RNNLayer':
+        rnn_params = ' '.join((fp['rnn_W_hid_to_hid'].__class__.__name__,
+                               fp['rnn_W_in_to_hid'].__class__.__name__,
+                               fp['rnn_b'].__class__.__name__,
+                               str(fp['rnn_b'].val)))
+
     print("{0}|{1}|{2}|{3}|{4}|{5}|{6}|{7}|{8}|{9}|{10}|{11}|{12}|{13}|"
           "{14}|{15}|{16}|{17}|{18}|{19}|{20}|{21}|{22}|{23}|{24}|{25}|"
           "{26}|{27}|{28}|{29}|{30}|{31}|{32}|{33}|{34}|{35}|{36}|{37}|"
           "{38}|{39}|{40}|{41}|{42}|{43}|{44}|{45}|{46}|{47}|{48}|{49}|"
-          "{50}|{51}|{52}|{53}|{54}|{55}|{56}|{57}|{58}|{59}|{60}|{61}|"
-          "{62}|{63}|{64}|{65}|{66}|{67}|{68}|{69}|{70}|").format(
+          "{50}|"
+          ).format(
+
+        # Batch fp
+        fp['batch_size'],
+
+        # Dataset
+        fp['color'],
+        fp['color_space'],
+        fp['shuffle'],
+
+        # Pre_processing
+        fp['preprocess_type'],
+        fp['patch_size'] + ' ' +
+        fp['max_patches'] if fp['preprocess_type'] in ('conv-zca', 'sub-lcn',
+                                                       'subdiv-lcn',
+                                                       'local_mean_sub')
+        else ' ',
+        fp['resize_images'],
+        fp['resize_size'],
+
+        # Data augmentation
+        fp['do_random_flip'],
+        fp['do_random_shift'],
+        fp['do_random_invert_color'],
+
         # Input Conv layers
         fp['in_nfilters'],
         fp['in_filters_size'] if isinstance(fp['in_nfilters'],
                                             collections.Iterable) else ' ',
         fp['in_filters_stride'] if isinstance(fp['in_nfilters'],
                                               collections.Iterable) else ' ',
-        fp['in_W_init'].__class__.__name__,
-        fp['in_b_init'].__class__.__name__ + ' ' + str(fp['in_b_init'].val),
-        fp['in_nonlinearity'].__name__,
-        # 0 -> 5
+        fp['in_W_init'].__class__.__name__ + ' , ' +
+        fp['in_b_init'].__class__.__name__ + ' ' + str(fp['in_b_init'].val)
+        if isinstance(fp['in_nfilters'], collections.Iterable) else ' ',
+        fp['in_nonlinearity'].__name__
+        if isinstance(fp['in_nfilters'], collections.Iterable) else ' ',
+
 
         # RNNs layers
         fp['dim_proj'],
-        fp['pwidth'],
-        fp['pheight'],
+        (fp['pwidth'], fp['pheight']),
         fp['stack_sublayers'],
         fp['RecurrentNet'].__name__,
-        fp['nonlinearity'].__name__,
+        fp['nonlinearity'].__name__
+        if fp['RecurrentNet'].__name__ in ('LSTMLayer', 'RNNLayer') else ' ',
+
         fp['hid_init'].__class__.__name__ + ' ' + str(fp['hid_init'].val),
         fp['grad_clipping'],
         # fp['precompute_input'],
         # fp['mask_input'],
-        # 6 -> 13
 
-        # GRU specific fp
-        fp['gru_resetgate'].__class__.__name__
-        if fp['RecurrentNet'].__name__ == 'GRULayer' else ' ',
-
-        fp['gru_updategate'].__class__.__name__
-        if fp['RecurrentNet'].__name__ == 'GRULayer' else ' ',
-
-        fp['gru_hidden_update'].__class__.__name__
-        if fp['RecurrentNet'].__name__ == 'GRULayer' else ' ',
-
-        fp['gru_hid_init'].__class__.__name__ + ' ' +
-                                                str(fp['gru_hid_init'].val)
-        if fp['RecurrentNet'].__name__ == 'GRULayer' else ' ',
-        # 14 -> 17
-
-        # LSTM specific fp
-        fp['lstm_ingate'].__class__.__name__
-        if fp['RecurrentNet'].__name__ == 'LSTMLayer' else ' ',
-
-        fp['lstm_forgetgate'].__class__.__name__
-        if fp['RecurrentNet'].__name__ == 'LSTMLayer' else ' ',
-
-        fp['lstm_cell'].__class__.__name__
-        if fp['RecurrentNet'].__name__ == 'LSTMLayer' else ' ',
-
-        fp['lstm_outgate'].__class__.__name__
-        if fp['RecurrentNet'].__name__ == 'LSTMLayer' else ' ',
-        # 18 -> 21
-
-        # RNN specific fp
-        fp['rnn_W_in_to_hid'].__class__.__name__
-        if fp['RecurrentNet'].__name__ == 'RNNLayer' else ' ',
-
-        fp['rnn_W_hid_to_hid'].__class__.__name__
-        if fp['RecurrentNet'].__name__ == 'RNNLayer' else ' ',
-
-        fp['rnn_b'].__class__.__name__ + ' ' + str(fp['rnn_b'].val)
-        if fp['RecurrentNet'].__name__ == 'RNNLayer' else ' ',
-        # 22 -> 24
+        rnn_params,
 
         # Output upsampling layers
         fp['out_upsampling'],
         fp['out_nfilters'] if fp['out_upsampling'] == 'grad' else ' ',
         fp['out_filters_size'] if fp['out_upsampling'] == 'grad' else ' ',
         fp['out_filters_stride'] if fp['out_upsampling'] == 'grad' else ' ',
-        fp['out_W_init'].__class__.__name__,
+        fp['out_W_init'].__class__.__name__ + ', ' +
         fp['out_b_init'].__class__.__name__ + ' ' + str(fp['out_b_init'].val),
-        fp['out_nonlinearity'].__name__,
-        # 25 -> 31
+        fp['out_nonlinearity'].__name__ if fp['out_upsampling'] != 'linear'
+        else ' ',
 
         # Prediction, Softmax
         fp['intermediate_pred'],
         fp['class_balance'],
-        # 32 -> 33
 
         # Special layers
         fp['batch_norm'],
@@ -159,66 +169,31 @@ def print_params(fp, print_commit_hash=False, plot=False,
         fp['dropout_rate'] if fp['use_dropout'] else ' ',
         fp['use_dropout_x'],
         fp['dropout_x_rate'] if fp['use_dropout_x'] else ' ',
-        # 34 -> 38
+
 
         # Optimization method
         fp['optimizer'].__name__,
         fp.get('learning_rate', ' '),
-        fp.get('momentum', ' '),
-        fp.get('beta1', ' '),
-        fp.get('beta2', ' '),
-        fp.get('epsilon', ' '),
+        ','.join((str(fp.get('momentum', ' ')),
+                  str(fp.get('beta1', ' ')),
+                  str(fp.get('beta2', ' ')),
+                  str(fp.get('epsilon', ' '))
+                  )),
         fp['weight_decay'],
         fp['weight_noise'],
-        # 39 -> 47
+
 
         # Early stopping
         fp['patience'],
         fp['max_epochs'],
         fp['min_epochs'],
-        # 48 -> 50
+        len(errs),
 
-        # Save, display fp
-        # fp['dispFreq'],
-        # fp['validFreq'],
-        # fp['saveFreq'],
-        # fp['n_save'],
-
-        # Batch fp
-        fp['batch_size'],
-        fp['valid_batch_size'],
-        fp['shuffle'],
-        # 51 -> 53
-
-        # Dataset
-        fp['dataset'],
-        fp['color_space'],
-        fp['color'],
-        fp['resize_images'],
-        fp['resize_size'],
-        # 54 -> 58
-
-        # Pre_processing
-        fp['preprocess_type'],
-        fp['patch_size'],
-        fp['max_patches'] if fp['preprocess_type'] in ('conv-zca', 'sub-lcn',
-                                                       'subdiv-lcn',
-                                                       'local_mean_sub')
-        else ' ',
-        # 59 -> 60
-
-        # Data augmentation
-        fp['do_random_flip'],
-        fp['do_random_shift'],
-        fp['do_random_invert_color'],
-        fp['shift_pixels'],
-        fp['reload_'],
         error[0],
         error[1],
         error[2],
         error[3],
         error[4]
-        # 61 -> 70
     )
 
     if len(best_test_class_acc) > 0:
@@ -279,7 +254,9 @@ def print_params(fp, print_commit_hash=False, plot=False,
             plt.grid(True)
         plt.show()
     if print_history:
+        i = 0
         for e, c, iou in zip(errs, conf_matrices, iou_indeces):
+            i += 1
 
             train_global_acc, \
              train_mean_class_acc, \
@@ -351,6 +328,9 @@ def print_params(fp, print_commit_hash=False, plot=False,
                     print ""
                     print('Test Confusion matrix')
                     print(tabulate(test_conf_matrix_norm, headers=headers))
+
+            if i == 3:
+                break
 
     return 1
 
