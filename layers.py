@@ -632,6 +632,7 @@ class ReNetLayer(lasagne.layers.Layer):
         else:
             # #W, #H, bs, psize
             input_sublayer1 = l_in
+            cchannels = cchannels * pwidth * pheight
 
             # Invert rows and columns: #H, #W, bs, psize
             input_sublayer1 = lasagne.layers.DimshuffleLayer(
