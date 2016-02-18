@@ -104,6 +104,7 @@ def print_params(fp, print_commit_hash=False, plot=False,
         # Dataset
         fp['color'],
         fp['color_space'],
+        fp.get('use_depth', ' '),
         fp['shuffle'],
 
         # Pre_processing

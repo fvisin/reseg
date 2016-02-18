@@ -411,6 +411,7 @@ def train(saveto='model.npz',
           dataset='horses',
           color_space='RGB',
           color=True,
+          use_depth=None,
           resize_images=True,
           resize_size=-1,
 
@@ -567,6 +568,7 @@ def train(saveto='model.npz',
     dataset = options['dataset']
     color_space = options['color_space']
     color = options['color']
+    use_depth = options['use_depth']
     resize_images = options['resize_images']
     resize_size = options['resize_size']
 
@@ -615,6 +617,7 @@ def train(saveto='model.npz',
         color=color,
         color_space=color_space,
         rng=rng,
+        use_depth=use_depth,
         with_filenames=True,
         with_fullmasks=True)
 
