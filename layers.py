@@ -43,6 +43,9 @@ class ReSegLayer(lasagne.layers.Layer):
                  grad_clipping=0,
                  precompute_input=True,
                  mask_input=None,
+                 # 1x1 Conv layer for dimensional reduction
+                 conv_dim_red=False,
+                 conv_dim_red_nonlinearity=lasagne.nonlinearities.identity,
                  # GRU specific params
                  gru_resetgate=lasagne.layers.Gate(W_cell=None),
                  gru_updategate=lasagne.layers.Gate(W_cell=None),
@@ -262,8 +265,6 @@ class ReSegLayer(lasagne.layers.Layer):
             self.sublayers.append(l_renet)
             self.hypotetical_fm_size /= (pwidth[lidx], pheight[lidx])
 
-            # TODO: insert NIN 1x1 ConvLayer after ReNet
-
             # Print shape
             out_shape = get_output_shape(l_renet)
             n_rnns = 2 if stack_sublayers[lidx] else 4
@@ -271,6 +272,35 @@ class ReSegLayer(lasagne.layers.Layer):
             print('ReNet: After {} rnns {}x{} @ {}: {}'.format(
                 n_rnns, pheight[lidx], pwidth[lidx], dim_proj[lidx],
                 out_shape))
+
+            # 1x1 conv layer : dimensional reduction layer
+            if conv_dim_red:
+                l_renet = lasagne.layers.DimshuffleLayer(
+                    l_renet,
+                    (0, 3, 1, 2),
+                    name=self.name + "_1x1_conv_dimshuffle")
+
+                l_renet = lasagne.layers.Conv2DLayer(
+                    l_renet,
+                    num_filters=dim_proj[lidx],
+                    filter_size=(1, 1),
+                    W=lasagne.init.GlorotUniform(),
+                    b=lasagne.init.Constant(0.),
+                    pad='valid',
+                    nonlinearity=conv_dim_red_nonlinearity,
+                    name=self.name + '_1x1_conv_layer' + str(lidx)
+                )
+                out_shape = get_output_shape(l_renet)
+                out_shape = (out_shape[0], out_shape[2],
+                             out_shape[3], out_shape[1])
+
+                print('RecSeg: After 1x1 convnet: {}'.format(out_shape))
+
+                # invert the dimshuffle before 1x1 convolution
+                l_renet = lasagne.layers.DimshuffleLayer(
+                    l_renet,
+                    (0, 2, 3, 1),
+                    name=self.name + "_1x1_conv_undimshuffle")
 
         # Upsampling
         if out_upsampling_type == 'autograd':

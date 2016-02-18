@@ -80,6 +80,9 @@ def buildReSeg(input_shape, input_var,
                grad_clipping=0,
                precompute_input=True,
                mask_input=None,
+               # 1x1 Conv layer for dimensional reduction
+               conv_dim_red=False,
+               conv_dim_red_nonlinearity=lasagne.nonlinearities.identity,
                # GRU specific params
                gru_resetgate=lasagne.layers.Gate(W_cell=None),
                gru_updategate=lasagne.layers.Gate(W_cell=None),
@@ -150,6 +153,9 @@ def buildReSeg(input_shape, input_var,
                          grad_clipping=grad_clipping,
                          precompute_input=precompute_input,
                          mask_input=mask_input,
+                         # 1x1 Conv layer for dimensional reduction
+                         conv_dim_red=conv_dim_red,
+                         conv_dim_red_nonlinearity=conv_dim_red_nonlinearity,
                          # GRU specific params
                          gru_resetgate=gru_resetgate,
                          gru_updategate=gru_updategate,
@@ -336,6 +342,10 @@ def train(saveto='model.npz',
           precompute_input=True,
           mask_input=None,
 
+          # 1x1 Conv layer for dimensional reduction
+          conv_dim_red=False,
+          conv_dim_red_nonlinearity=lasagne.nonlinearities.identity,
+
           # GRU specific params
           gru_resetgate=lasagne.layers.Gate(W_cell=None),
           gru_updategate=lasagne.layers.Gate(W_cell=None),
@@ -510,6 +520,10 @@ def train(saveto='model.npz',
     grad_clipping = options['grad_clipping']
     precompute_input = options['precompute_input']
     mask_input = options['mask_input']
+
+    # 1x1 Conv layer for dimensional reduction
+    conv_dim_red = options['conv_dim_red']
+    conv_dim_red_nonlinearity = options['conv_dim_red_nonlinearity']
 
     # GRU specific params
     gru_resetgate = options['gru_resetgate']
@@ -740,6 +754,9 @@ def train(saveto='model.npz',
                        grad_clipping=grad_clipping,
                        precompute_input=precompute_input,
                        mask_input=mask_input,
+                       # 1x1 Conv layer for dimensional reduction
+                       conv_dim_red=conv_dim_red,
+                       conv_dim_red_nonlinearity=conv_dim_red_nonlinearity,
                        # GRU specific params
                        gru_resetgate=gru_resetgate,
                        gru_updategate=gru_updategate,
