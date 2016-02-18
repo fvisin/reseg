@@ -1091,9 +1091,13 @@ class DeconvLayer(lasagne.layers.Layer):
 def get_deconv_size(input_size, filter_size, stride, pad):
     if input_size is None:
         return None
-
+    input_size = np.array(input_size)
+    filter_size = np.array(filter_size)
+    stride = np.array(stride)
     if isinstance(pad, (int, Iterable)) and not isinstance(pad, str):
+        pad = np.array(pad)
         output_size = (input_size - 1) * stride + filter_size - 2*pad
+
     elif pad == 'full':
         output_size = input_size * stride - filter_size - stride + 2
     elif pad == 'valid':
