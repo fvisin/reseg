@@ -95,7 +95,7 @@ def print_params(fp, print_commit_hash=False, plot=False,
           "{14}|{15}|{16}|{17}|{18}|{19}|{20}|{21}|{22}|{23}|{24}|{25}|"
           "{26}|{27}|{28}|{29}|{30}|{31}|{32}|{33}|{34}|{35}|{36}|{37}|"
           "{38}|{39}|{40}|{41}|{42}|{43}|{44}|{45}|{46}|{47}|{48}|{49}|"
-          "{50}|"
+          "{50}|{51}|"
           ).format(
 
         # Batch fp
@@ -109,10 +109,11 @@ def print_params(fp, print_commit_hash=False, plot=False,
 
         # Pre_processing
         fp['preprocess_type'],
-        fp['patch_size'] + ' ' +
-        fp['max_patches'] if fp['preprocess_type'] in ('conv-zca', 'sub-lcn',
-                                                       'subdiv-lcn',
-                                                       'local_mean_sub')
+        str(fp['patch_size']) + ' ' +
+        str(fp['max_patches']) if fp['preprocess_type'] in ('conv-zca',
+                                                            'sub-lcn',
+                                                            'subdiv-lcn',
+                                                            'local_mean_sub')
         else ' ',
         fp['resize_images'],
         fp['resize_size'],
@@ -330,7 +331,7 @@ def print_params(fp, print_commit_hash=False, plot=False,
                     print('Test Confusion matrix')
                     print(tabulate(test_conf_matrix_norm, headers=headers))
 
-            if i == 3:
+            if i == -6:
                 break
 
     return 1
