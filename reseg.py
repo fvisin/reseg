@@ -934,20 +934,31 @@ def train(saveto='model.npz',
                 options['history_conf_matrix'] = np.array(history_conf_matrix)
                 options['history_iou_index'] = np.array(history_iou_index)
 
-                return valid_global_acc
+                return valid_global_acc, test_global_acc
 
             # Check predictions' accuracy
             if np.mod(uidx, validFreq) == 0:
-                valid_global_acc = validate_model()
+                valid_global_acc, test_global_acc = validate_model()
 
                 # Did we improve *validation* accuracy?
-                if len(history_acc) == 0 or valid_global_acc >= np.array(
-                        history_acc)[:, 3].max():
+                if (len(valid) > 0 and
+                    (len(history_acc) == 0 or valid_global_acc >= np.array(
+                        history_acc)[:, 3].max())):
 
                     # TODO check if CUDA variables!
                     bestparams = lasagne.layers.get_all_param_values(l_out)
                     patience_counter = 0
                     save = True  # Save model params
+                else:
+                    # if validation set is empty check test set to save params
+                    if len(history_acc) == 0 or test_global_acc >= np.array(
+                            history_acc)[:, 6].max():
+                        # TODO check if CUDA variables!
+                        bestparams = lasagne.layers.get_all_param_values(
+                            l_out)
+                        patience_counter = 0
+                        # Save model params
+                        save = True
 
                 # Early stop if patience is over
                 if (eidx > min_epochs):
@@ -1025,16 +1036,18 @@ def show_seg(dataset_name, n_exp, dataset_set, mode='sequential', id=-1):
 
     # now go in the default directory to retrieve all the prediction masks
     name = options['dataset']
-    color_list = colormap_datasets[name]
 
     print("Loading data ...")
-    load_data, properties = get_dataset(name)
-    train, valid, test, mean, std, filenames = load_data(
+    load_data, properties = get_dataset(options['dataset'])
+    train, valid, test, mean, std, filenames, fullmasks = load_data(
         resize_images=options['resize_images'],
         resize_size=options['resize_size'],
         color=options['color'],
         color_space=options['color_space'],
-        with_filenames=True)
+        rng=options['rng'],
+        use_depth=options['use_depth'],
+        with_filenames=True,
+        with_fullmasks=True)
 
     if load_from_file:
         seg_path = os.path.abspath(
@@ -1054,37 +1067,65 @@ def show_seg(dataset_name, n_exp, dataset_set, mode='sequential', id=-1):
         images = test[0]
         gt = test[1]
 
-    for im, mask, f in zip(images, gt, filenames[id_f]):
-        outpath = os.path.join(seg_path, dataset_set, os.path.basename(f))
-        mask_rgb = label2rgb(mask, colors=color_list)
-        mask_pred = load(outpath)
 
-        fig = plt.figure(figsize=(20, 10))
-        fig.add_subplot(1, 3, 1)
-        plt.imshow(im)
+    # TODO: we need a single function with alla the params to create the
+    # model so we call it from train or from show_seg
 
-        fig.add_subplot(1, 3, 2)
-        plt.imshow(mask_rgb)
 
-        fig.add_subplot(1, 3, 3)
-        plt.imshow(mask_pred)
-        plt.show(block=False)
-        raw_input("Press Enter to show the next image")
 
-        plt.close(fig)
+    out_layer, f_pred = buildReSeg(input_shape, input_var,
+                                   n_layers, pheight, pwidth,
+                                   dim_proj, nclasses, stack_sublayers,
+                                   # upsampling
+                                   out_upsampling,
+                                   out_nfilters,
+                                   out_filters_size,
+                                   out_filters_stride,
+                                   out_W_init=out_W_init,
+                                   out_b_init=out_b_init,
+                                   out_nonlinearity=out_nonlinearity,
+                                   # input ConvLayers
+                                   in_nfilters=in_nfilters,
+                                   in_filters_size=in_filters_size,
+                                   in_filters_stride=in_filters_stride,
+                                   in_W_init=in_W_init,
+                                   in_b_init=in_b_init,
+                                   in_nonlinearity=in_nonlinearity,
+                                   # common recurrent layer params
+                                   RecurrentNet=RecurrentNet,
+                                   nonlinearity=nonlinearity,
+                                   hid_init=hid_init,
+                                   grad_clipping=grad_clipping,
+                                   precompute_input=precompute_input,
+                                   mask_input=mask_input,
+                                   # 1x1 Conv layer for dimensional reduction
+                                   conv_dim_red=conv_dim_red,
+                                   conv_dim_red_nonlinearity=
+                                   conv_dim_red_nonlinearity,
+                                   # GRU specific params
+                                   gru_resetgate=gru_resetgate,
+                                   gru_updategate=gru_updategate,
+                                   gru_hidden_update=gru_hidden_update,
+                                   gru_hid_init=gru_hid_init,
+                                   # LSTM specific params
+                                   lstm_ingate=lstm_ingate,
+                                   lstm_forgetgate=lstm_forgetgate,
+                                   lstm_cell=lstm_cell,
+                                   lstm_outgate=lstm_outgate,
+                                   # RNN specific params
+                                   rnn_W_in_to_hid=rnn_W_in_to_hid,
+                                   rnn_W_hid_to_hid=rnn_W_hid_to_hid,
+                                   rnn_b=rnn_b,
+                                   # special layers
+                                   batch_norm=batch_norm
+                                   )
 
-    else:
-        pass
-        # TODO: we need a single function with alla the params to create the
-        # model so we call it from train or from show_seg
+    # load params
+    with np.load('model.npz') as f:
+        bestparams_val = [f['arr_%d' % i] for i in range(len(f.files))]
+    lasagne.layers.set_all_param_values(out_layer, bestparams_val)
 
-        # out_layer = ReSeg()
-        # # load params
-        # with np.load('model.npz') as f:
-        #     bestparams_val = [f['arr_%d' % i] for i in range(len(f.files))]
-        # lasagne.layers.set_all_param_values(out_layer, bestparams_val)
-        #
-        # #compute prediction on the dataset or on the image that we specified
+    # compute prediction on the dataset or on the image that we specified
 
 if __name__ == '__main__':
 
