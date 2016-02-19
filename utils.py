@@ -148,9 +148,7 @@ def validate(f_pred,
                     # f = f.replace(".pgm", ".png")
 
                     # need  to handle RGB-D or grey_img + disparity
-                    if mini_x.shape[-1] == 1:
-                        mini_x = gray2rgb(mini_x)
-                    elif mini_x.shape[-1] == 2:
+                    if mini_x.shape[-1] in (1, 2):
                         mini_x = gray2rgb(mini_x[:, :, 0])
                     elif mini_x.shape[-1] == 4:
                         mini_x = mini_x[:, :, :-1]
