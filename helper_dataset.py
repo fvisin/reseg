@@ -165,6 +165,45 @@ def save_RGB_mask(outpath, mask):
     return
 
 
+def preprocess_dataset(train, valid, test,
+                       preprocess_type,
+                       patch_size, max_patches):
+
+    if preprocess_type is None:
+        return train, valid, test
+
+    # whiten, LCN, GCN, Local Mean Subtract, or normalize
+    print("Preprocessing train set with ", preprocess_type, " ", patch_size)
+    train_pre = []
+    for x in train[0]:
+        # TODO: add an axis before everything
+        x_pre = preprocess(np.expand_dims(x, axis=0), preprocess_type,
+                           patch_size,
+                           max_patches)
+        train_pre.append(x_pre[0])
+    train = (np.array(train_pre), np.array(train[1]))
+
+    print("Preprocessing valid set with ", preprocess_type, " ", patch_size)
+    valid_pre = []
+    for x in valid[0]:
+        x_pre = preprocess(np.expand_dims(x, axis=0), preprocess_type,
+                           patch_size,
+                           max_patches)
+        valid_pre.append(x_pre[0])
+    valid = (np.array(valid_pre), np.array(valid[1]))
+
+    print("Preprocessing test set with ", preprocess_type, " ", patch_size)
+    test_pre = []
+    for x in test[0]:
+        x_pre = preprocess(np.expand_dims(x, axis=0), preprocess_type,
+                           patch_size,
+                           max_patches)
+        test_pre.append(x_pre[0])
+    test = (np.array(test_pre), np.array(test[1]))
+
+    return train, valid, test
+
+
 def preprocess(x, mode=None,
                patch_size=9,
                max_patches=int(1e5)):
@@ -223,7 +262,7 @@ def lecun_lcn(input, kernel_size=9, threshold=1e-4, use_divisor=False):
 
     convout = conv2d(input=X,
                      filters=filters,
-                     image_shape=input.shape,
+                     input_shape=input.shape,
                      filter_shape=filter_shape,
                      border_mode='full')
 
@@ -235,7 +274,7 @@ def lecun_lcn(input, kernel_size=9, threshold=1e-4, use_divisor=False):
         # Scale down norm of kernel_size x kernel_size patch
         sum_sqr_XX = conv2d(input=T.sqr(T.abs_(new_X)),
                             filters=filters,
-                            image_shape=input.shape,
+                            input_shape=input.shape,
                             filter_shape=filter_shape,
                             border_mode='full')
 
@@ -263,7 +302,7 @@ def local_mean_subtraction(input, kernel_size=5):
 
     mean = conv2d(input=X,
                   filters=filters,
-                  image_shape=input.shape,
+                  input_shape=input.shape,
                   filter_shape=filter_shape,
                   border_mode='full')
     mid = int(floor(kernel_size/2.))
@@ -407,12 +446,12 @@ def convolutional_zca(input, patch_size=(9, 9), max_patches=int(1e5)):
     kernel = kernel.astype(floatX)
     input = input.astype(floatX)
     input_images = T.tensor4(dtype=floatX)
-    conv_whitening = T.nnet.conv2d(input_images.dimshuffle((0, 3, 1, 2)),
-                                   kernel,
-                                   image_shape=image_shape,
-                                   filter_shape=filter_shape,
-                                   border_mode='full'
-                                   )
+    conv_whitening = conv2d(input_images.dimshuffle((0, 3, 1, 2)),
+                            kernel,
+                            input_shape=image_shape,
+                            filter_shape=filter_shape,
+                            border_mode='full'
+                            )
 
     s_crop = [(patch_size[0] - 1) // 2,
               (patch_size[1] - 1) // 2]

@@ -19,7 +19,7 @@ from theano import tensor as T
 from theano.compile.nanguardmode import NanGuardMode
 
 # Local application/library specific imports
-from helper_dataset import preprocess
+from helper_dataset import preprocess_dataset
 from config_datasets import colormap_datasets
 from get_info_model import print_params
 from layers import CropLayer, ReSegLayer
@@ -641,6 +641,12 @@ def train(saveto='model.npz',
         if std.ndim == 3:
             std = np.expand_dims(std, axis=3)
 
+    # Preprocess each image separately usually with LCN in order not to lose
+    # time at each epoch
+    train, valid, test = preprocess_dataset(train, valid, test,
+                                            preprocess_type,
+                                            patch_size, max_patches)
+
     # Compute the indexes of the images to be saved
     if isinstance(n_save, collections.Iterable):
         samples_ids = np.array(n_save)
@@ -828,11 +834,6 @@ def train(saveto='model.npz',
             targets = targets.astype(intX)
             targets_flat = targets.flatten()
 
-            # TODO: preprocess function
-            # whiten, LCN, GCN, Local Mean Subtract, or normalize
-            x = preprocess(inputs,
-                           preprocess_type,
-                           patch_size, max_patches)
             dd = time.time() - st
             st = time.time()
 
