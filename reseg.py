@@ -719,6 +719,7 @@ def train(saveto='model.npz',
         train, _, _, _, _ = load_data(
             resize_images=resize_images, resize_size=resize_size,
             color=color, color_space=color_space, rng=rng)
+
         x_tag = (train[0][0:batch_size]).astype(floatX)
         y_tag = (train[1][0:batch_size]).astype(intX)
 
@@ -830,7 +831,10 @@ def train(saveto='model.npz',
             nsamples += len(inputs)
             uidx += 1
 
-            inputs = inputs.astype(floatX)
+            # otherwise the normalization has been done before the preprocess
+            if preprocess_type is None:
+                inputs = inputs.astype(floatX)
+
             targets = targets.astype(intX)
             targets_flat = targets.flatten()
 

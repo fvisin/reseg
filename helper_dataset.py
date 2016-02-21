@@ -16,7 +16,7 @@ from skimage import exposure
 from skimage import io
 from skimage import img_as_float, img_as_ubyte, img_as_uint, img_as_int
 from skimage.color import label2rgb, rgb2hsv, hsv2rgb
-from skimage.io import ImageCollection, imsave
+from skimage.io import ImageCollection, imsave, imshow
 from skimage.transform import resize
 
 
@@ -176,8 +176,8 @@ def preprocess_dataset(train, valid, test,
     print("Preprocessing train set with ", preprocess_type, " ", patch_size)
     train_pre = []
     for x in train[0]:
-        # TODO: add an axis before everything
-        x_pre = preprocess(np.expand_dims(x, axis=0), preprocess_type,
+        img = (np.expand_dims(x, axis=0) / 255.).astype(floatX)
+        x_pre = preprocess(img, preprocess_type,
                            patch_size,
                            max_patches)
         train_pre.append(x_pre[0])
@@ -186,7 +186,8 @@ def preprocess_dataset(train, valid, test,
     print("Preprocessing valid set with ", preprocess_type, " ", patch_size)
     valid_pre = []
     for x in valid[0]:
-        x_pre = preprocess(np.expand_dims(x, axis=0), preprocess_type,
+        img = (np.expand_dims(x, axis=0) / 255.).astype(floatX)
+        x_pre = preprocess(img, preprocess_type,
                            patch_size,
                            max_patches)
         valid_pre.append(x_pre[0])
@@ -195,7 +196,8 @@ def preprocess_dataset(train, valid, test,
     print("Preprocessing test set with ", preprocess_type, " ", patch_size)
     test_pre = []
     for x in test[0]:
-        x_pre = preprocess(np.expand_dims(x, axis=0), preprocess_type,
+        img = (np.expand_dims(x, axis=0) / 255.).astype(floatX)
+        x_pre = preprocess(img, preprocess_type,
                            patch_size,
                            max_patches)
         test_pre.append(x_pre[0])
@@ -264,11 +266,8 @@ def lecun_lcn(input, kernel_size=9, threshold=1e-4, use_divisor=False):
                      filters=filters,
                      input_shape=input.shape,
                      filter_shape=filter_shape,
-                     border_mode='full')
-
-    # For each pixel, remove mean of kernel_size x kernel_size neighborhood
-    mid = int(floor(kernel_size/2.))
-    new_X = X - convout[:, :, mid:-mid, mid:-mid] # this is centered
+                     border_mode='half')
+    new_X = X - convout
 
     if use_divisor:
         # Scale down norm of kernel_size x kernel_size patch
@@ -276,9 +275,9 @@ def lecun_lcn(input, kernel_size=9, threshold=1e-4, use_divisor=False):
                             filters=filters,
                             input_shape=input.shape,
                             filter_shape=filter_shape,
-                            border_mode='full')
+                            border_mode='half')
 
-        denom = T.sqrt(sum_sqr_XX[:, :, mid:-mid, mid:-mid])
+        denom = T.sqrt(sum_sqr_XX)
         per_img_mean = denom.mean(axis=[2, 3])
         divisor = T.largest(per_img_mean.dimshuffle(0, 1, 'x', 'x'), denom)
         divisor = T.maximum(divisor, threshold)
@@ -304,10 +303,8 @@ def local_mean_subtraction(input, kernel_size=5):
                   filters=filters,
                   input_shape=input.shape,
                   filter_shape=filter_shape,
-                  border_mode='full')
-    mid = int(floor(kernel_size/2.))
-
-    new_X = X - mean[:, :, mid:-mid, mid:-mid]
+                  border_mode='half')
+    new_X = X - mean
     f = function([X], new_X)
     return f(input)
 
@@ -360,7 +357,7 @@ def gaussian_filter(kernel_shape):
 
     mid = floor(kernel_shape/ 2.)
     for i in xrange(0,kernel_shape):
-        for j in xrange(0,kernel_shape):
+        for j in xrange(0, kernel_shape):
             x[i, j] = gauss(i-mid, j-mid)
 
     return x / sum(x)
