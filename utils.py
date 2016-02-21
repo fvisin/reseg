@@ -53,6 +53,7 @@ def save_image(outpath, img):
 def validate(f_pred,
              data,
              batchsize,
+             preprocess_type=None,
              nclasses=2,
              samples_ids=-1,
              dataset='camvid',
@@ -130,7 +131,8 @@ def validate(f_pred,
                                          batchsize,
                                          shuffle=False):
         mini_x, mini_y, mini_idx = minibatch
-        mini_x = img_as_float(mini_x)
+        if preprocess_type is None:
+            mini_x = img_as_float(mini_x)
         mini_f = filenames[mini_idx]
         preds = f_pred(mini_x.astype(floatX))
 
