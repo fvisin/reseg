@@ -306,9 +306,9 @@ class ReSegLayer(lasagne.layers.Layer):
 
                 # Print shape
                 out_shape = get_output_shape(l_upsampling)
-                print('Autograd: {}x{} (str {}x{}) @ {}:' +
-                      '{}'.format(filter_size[0], filter_size[1], stride[0],
-                                  stride[1], out_nfilters[l], out_shape))
+                print('Autograd: {}x{} (str {}x{}) @ {}:{}'.format(
+                    filter_size[0], filter_size[1], stride[0], stride[1],
+                    out_nfilters[l], out_shape))
 
                 # CROP
                 # pad in DeconvLayer cannot be a tensor --> we cannot
