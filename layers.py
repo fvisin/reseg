@@ -290,9 +290,10 @@ class ReSegLayer(lasagne.layers.Layer):
             filter_size = to_int(ceildiv((h1 * (h1 - 1) + h2 - h2 * h0),
                                          (h1 - h0)))
 
-            h0 = get_output(l_renet).shape[2:]
+            target_shape = get_output(l_renet).shape[2:]
             l_upsampling = l_renet
             for l in range(nlayers):
+                target_shape = target_shape * up_ratio
                 l_upsampling = DeconvLayer(
                     l_upsampling,
                     num_filters=out_nfilters[l],
@@ -302,7 +303,7 @@ class ReSegLayer(lasagne.layers.Layer):
                     b=out_b_init,
                     nonlinearity=out_nonlinearity)
                 self.sublayers.append(l_upsampling)
-                h1 = get_output(l_upsampling).shape[2:]
+                up_shape = get_output(l_upsampling).shape[2:]
 
                 # Print shape
                 out_shape = get_output_shape(l_upsampling)
@@ -317,17 +318,16 @@ class ReSegLayer(lasagne.layers.Layer):
                 #    np.array(get_all_layers(l_renet)[0].shape[1:3]) +
                 #    get_equivalent_input_padding(l_renet)))
                 # TODO last layer check
-                crop = T.max(T.stack([h1 - h0 * up_ratio, T.zeros(2)]), axis=0)
+                crop = T.max(T.stack([up_shape - target_shape, T.zeros(2)]),
+                             axis=0)
                 crop = crop.astype('uint8')  # round down
                 l_upsampling = CropLayer(
                     l_upsampling,
                     crop,
                     data_format='bc01')
                 self.sublayers.append(l_upsampling)
-                h0 = get_output(l_upsampling).shape[2:]
 
                 # Print shape
-                out_shape = get_output_shape(l_upsampling)
                 print('Dynamic cropping')
 
         elif out_upsampling_type == 'grad':
