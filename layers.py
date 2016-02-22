@@ -1132,42 +1132,59 @@ class CropLayer(lasagne.layers.Layer):
                  **kwargs):
         super(CropLayer, self).__init__(l_in, crop, **kwargs)
         assert data_format in ['bc01', 'b01c']
+        if not isinstance(crop, T.TensorVariable):
+            crop = lasagne.utils.as_tuple(crop, 2)
         self.crop = crop
         self.data_format = data_format
         self.centered = centered
 
     def get_output_shape_for(self, input_shape, **kwargs):
-        #  crop = self.crop
-
-        # if self.data_format == 'bc01':
-        #     input_shape[2] -= crop[0]
-        #     input_shape[3] -= crop[1]
-        # else:
-        #     input_shape[1] -= crop[0]
-        #     input_shape[2] -= crop[1]
-        if self.data_format == 'bc01':
-            input_shape = list(input_shape)
-            input_shape[2] = None
-            input_shape[3] = None
+        # self.crop is a tensor --> we cannot know in advance how much
+        # we will crop
+        if isinstance(self.crop, T.TensorVariable):
+            if self.data_format == 'bc01':
+                input_shape = list(input_shape)
+                input_shape[2] = None
+                input_shape[3] = None
+            else:
+                input_shape = list(input_shape)
+                input_shape[1] = None
+                input_shape[2] = None
+        # self.crop is a list of ints
         else:
-            input_shape = list(input_shape)
-            input_shape[1] = None
-            input_shape[2] = None
+            if self.data_format == 'bc01':
+                input_shape = list(input_shape)
+                input_shape[2] -= self.crop[0]
+                input_shape[3] -= self.crop[1]
+            else:
+                input_shape = list(input_shape)
+                input_shape[1] -= self.crop[0]
+                input_shape[2] -= self.crop[1]
         return input_shape
 
     def get_output_for(self, input_arr, **kwargs):
-        crop = self.crop
-        # Indices have to be int
-        crop = crop.astype('int32')
-        if self.centered:
-            if self.data_format == 'bc01':
-                return input_arr[:, :, crop[0]/2:-crop[0] + crop[0]/2,
-                                 crop[1]/2:-crop[1] + crop[1]/2]
+        crop = self.crop.astype('int32')  # Indices have to be int
+        sz = input_arr.shape
+
+        if self.data_format == 'bc01':
+            if self.centered:
+                idx0 = T.switch(T.eq(-crop[0] + crop[0]/2, 0),
+                                sz[2], -crop[0] + crop[0]/2)
+                idx1 = T.switch(T.eq(-crop[1] + crop[1]/2, 0),
+                                sz[3], -crop[1] + crop[1]/2)
+                return input_arr[:, :, crop[0]/2:idx0, crop[1]/2:idx1]
             else:
-                return input_arr[:, crop[0]/2:-crop[0] + crop[0]/2,
-                                 crop[1]/2:-crop[1] + crop[1]/2, :]
+                idx0 = T.switch(T.eq(crop[0], 0), sz[2], crop[0])
+                idx1 = T.switch(T.eq(crop[1], 0), sz[3], crop[1])
+                return input_arr[:, :, :idx0, :idx1]
         else:
-            if self.data_format == 'bc01':
-                return input_arr[:, :, :-crop[0], :-crop[1]]
+            if self.centered:
+                idx0 = T.switch(T.eq(-crop[0] + crop[0]/2, 0),
+                                sz[1], -crop[0] + crop[0]/2)
+                idx1 = T.switch(T.eq(-crop[1] + crop[1]/2, 0),
+                                sz[2], -crop[1] + crop[1]/2)
+                return input_arr[:, crop[0]/2:idx0, crop[1]/2:idx1, :]
             else:
-                return input_arr[:, :-crop[0], :-crop[1], :]
+                idx0 = T.switch(T.eq(crop[0], 0), sz[1], crop[0])
+                idx1 = T.switch(T.eq(crop[1], 0), sz[2], crop[1])
+                return input_arr[:, :idx0, :idx1, :]
