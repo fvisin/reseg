@@ -115,7 +115,7 @@ def validate(f_pred,
         colormap = colormap_datasets[name]
 
     inputs, targets = data
-    conf_matrix = np.zeros([nclasses, nclasses])
+    conf_matrix = np.zeros([nclasses, nclasses]).astype('float32')
 
     im_idx = 0
     for minibatch in iterate_minibatches(inputs,
@@ -149,38 +149,25 @@ def validate(f_pred,
 
     # Compute metrics
     if void_is_present:
-        correctly_classified_pxls = np.trace(conf_matrix[0:-1, 0:-1])
-        pxls = np.sum(conf_matrix[0:-1, :])
-    else:
-        correctly_classified_pxls = np.trace(conf_matrix)
-        pxls = np.sum(conf_matrix)
+        conf_matrix = conf_matrix[:-1, :-1]
 
-    global_acc = correctly_classified_pxls / float(pxls)
+    # Compute per class metrics
+    per_class_TP = np.diagonal(conf_matrix)
+    per_class_FP = conf_matrix.sum(axis=0) - per_class_TP
+    per_class_FN = conf_matrix.sum(axis=1) - per_class_TP
+
+    n_pixels = np.sum(conf_matrix)
+    global_acc = per_class_TP.sum() / float(n_pixels)
 
     # Class Accuracy
-    total_per_class = conf_matrix.sum(axis=1)
-    cm_normalized = (conf_matrix.astype('float') /
-                     total_per_class[:, np.newaxis])
-    cm_normalized = np.nan_to_num(cm_normalized)
-    if void_is_present:
-        class_acc = cm_normalized.diagonal()[0:-1]
-    else:
-        class_acc = cm_normalized.diagonal()
-
-    # Mean Class Accuracy
+    class_acc = per_class_TP / (per_class_FN + per_class_TP)
+    class_acc = np.nan_to_num(class_acc)
     mean_class_acc = np.mean(class_acc)
 
-    # Intersection over Union index
-    FP = (conf_matrix.sum(axis=0) -
-          np.diagonal(conf_matrix))
-    iou_index = conf_matrix.diagonal().astype('float') / (total_per_class + FP)
+    # Class Intersection over Union
+    iou_index = per_class_TP / (per_class_TP + per_class_FP + per_class_FN)
     iou_index = np.nan_to_num(iou_index)
-
-    # Mean Intersection over Union
-    if void_is_present:
-        mean_iou_index = np.mean(iou_index[0:-1])
-    else:
-        mean_iou_index = np.mean(iou_index)
+    mean_iou_index = np.mean(iou_index)
 
     print >>sys.stderr, 'Done'
 
