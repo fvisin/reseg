@@ -186,31 +186,33 @@ def buildReSeg(input_shape, input_var,
         (T.prod(l_out_shape[0:3]), l_out_shape[3]),
         name='reshape_before_softmax')
 
-    l_pred = lasagne.layers.NonlinearityLayer(
+    l_out = lasagne.layers.NonlinearityLayer(
         l_out,
         nonlinearity=lasagne.nonlinearities.softmax,
         name="softmax_layer")
 
-    # Compile the function that gives back the mask prediction
-    # with deterministic=True we exclude stochastic layers such as dropout
-    prediction = lasagne.layers.get_output(l_pred, deterministic=True)
-    f_pred = theano.function(
-        [input_var],
-        T.argmax(prediction, axis=1).reshape(input_shape[:3]))
-
-    return l_pred, f_pred
+    return l_out
 
 
-def buildTrain(input_var, target_var, weights_loss, l_pred, weight_decay=0.):
+def getFunctions(input_var, target_var, class_balance_w_var, l_pred,
+                 weight_decay=0.):
     '''Helper function to build the training function
 
     '''
-    # Create a loss expression for training, i.e., a scalar objective we want
-    # to minimize (for our multi-class problem, it is the cross-entropy loss):
+    # Prediction function:
+    # computes the deterministic distribution over the labels, i.e. we
+    # disable the stochastic layers such as Dropout
+    prediction = lasagne.layers.get_output(l_pred, deterministic=True)
+    f_pred = theano.function(
+        [input_var],
+        T.argmax(prediction, axis=1).reshape(input_var.shape[:3]))
+
+    # Compute the loss to be minimized during training
     prediction = lasagne.layers.get_output(l_pred)
     loss = lasagne.objectives.categorical_crossentropy(
         prediction, target_var)
 
+    loss = class_balance_w_var * loss.mean()
     if weight_decay > 0:
         l2_penalty = lasagne.regularization.regularize_network_params(
             l_pred,
@@ -218,19 +220,20 @@ def buildTrain(input_var, target_var, weights_loss, l_pred, weight_decay=0.):
             tags={'regularizable': True})
         loss += l2_penalty * weight_decay
 
-    loss = weights_loss * loss.mean()
     params = lasagne.layers.get_all_params(l_pred, trainable=True)
     # Stochastic Gradient Descent (SGD) with Nesterov momentum
-    # updates = lasagne.updates.nesterov_momentum(
-    #         loss, params, learning_rate=LEARNING_RATE, momentum=0.9)
-    updates = lasagne.updates.adadelta(loss, params)
-    # Compile the function that performs a training step on a mini-batch
-    # (by using the updates dictionary) and returns the corresponding training
-    # loss:
-    f_train = theano.function([input_var, target_var, weights_loss], loss,
-                              updates=updates)
+    updates = lasagne.updates.nesterov_momentum(
+            loss, params, learning_rate=0.00001, momentum=0.9)
+    # updates = lasagne.updates.adadelta(loss, params)
 
-    return f_train
+    # Training function:
+    # computes the training loss (with stochasticity, if any) and
+    # updates the weights using the updates dictionary provided by the
+    # optimization function
+    f_train = theano.function([input_var, target_var, class_balance_w_var],
+                              loss, updates=updates)
+
+    return f_pred, f_train
 
 
 def train(saveto='model.npz',
@@ -592,7 +595,7 @@ def train(saveto='model.npz',
     input_shape = (batch_size, cheight, cwidth, cchannels)
     input_var = T.tensor4('inputs')
     target_var = T.ivector('targets')
-    weights_loss = T.scalar('weights_loss')
+    class_balance_w_var = T.scalar('class_balance_w_var')
 
     # Set the RandomStream to assure repeatability
     lasagne.random.set_rng(rng)
@@ -620,47 +623,47 @@ def train(saveto='model.npz',
         theano.config.compute_test_value = 'warn'
 
     # Build the model
-    out_layer, f_pred = buildReSeg(input_shape, input_var,
-                                   n_layers, pheight, pwidth,
-                                   dim_proj, nclasses, stack_sublayers,
-                                   # upsampling
-                                   out_upsampling,
-                                   out_nfilters,
-                                   out_filters_size,
-                                   out_filters_stride,
-                                   out_W_init=out_W_init,
-                                   out_b_init=out_b_init,
-                                   out_nonlinearity=out_nonlinearity,
-                                   # input ConvLayers
-                                   in_nfilters=in_nfilters,
-                                   in_filters_size=in_filters_size,
-                                   in_filters_stride=in_filters_stride,
-                                   in_W_init=in_W_init,
-                                   in_b_init=in_b_init,
-                                   in_nonlinearity=in_nonlinearity,
-                                   # common recurrent layer params
-                                   RecurrentNet=RecurrentNet,
-                                   nonlinearity=nonlinearity,
-                                   hid_init=hid_init,
-                                   grad_clipping=grad_clipping,
-                                   precompute_input=precompute_input,
-                                   mask_input=mask_input,
-                                   # GRU specific params
-                                   gru_resetgate=gru_resetgate,
-                                   gru_updategate=gru_updategate,
-                                   gru_hidden_update=gru_hidden_update,
-                                   gru_hid_init=gru_hid_init,
-                                   # LSTM specific params
-                                   lstm_ingate=lstm_ingate,
-                                   lstm_forgetgate=lstm_forgetgate,
-                                   lstm_cell=lstm_cell,
-                                   lstm_outgate=lstm_outgate,
-                                   # RNN specific params
-                                   rnn_W_in_to_hid=rnn_W_in_to_hid,
-                                   rnn_W_hid_to_hid=rnn_W_hid_to_hid,
-                                   rnn_b=rnn_b)
-    f_train = buildTrain(input_var, target_var, weights_loss, out_layer,
-                         weight_decay)
+    l_out = buildReSeg(input_shape, input_var,
+                       n_layers, pheight, pwidth,
+                       dim_proj, nclasses, stack_sublayers,
+                       # upsampling
+                       out_upsampling,
+                       out_nfilters,
+                       out_filters_size,
+                       out_filters_stride,
+                       out_W_init=out_W_init,
+                       out_b_init=out_b_init,
+                       out_nonlinearity=out_nonlinearity,
+                       # input ConvLayers
+                       in_nfilters=in_nfilters,
+                       in_filters_size=in_filters_size,
+                       in_filters_stride=in_filters_stride,
+                       in_W_init=in_W_init,
+                       in_b_init=in_b_init,
+                       in_nonlinearity=in_nonlinearity,
+                       # common recurrent layer params
+                       RecurrentNet=RecurrentNet,
+                       nonlinearity=nonlinearity,
+                       hid_init=hid_init,
+                       grad_clipping=grad_clipping,
+                       precompute_input=precompute_input,
+                       mask_input=mask_input,
+                       # GRU specific params
+                       gru_resetgate=gru_resetgate,
+                       gru_updategate=gru_updategate,
+                       gru_hidden_update=gru_hidden_update,
+                       gru_hid_init=gru_hid_init,
+                       # LSTM specific params
+                       lstm_ingate=lstm_ingate,
+                       lstm_forgetgate=lstm_forgetgate,
+                       lstm_cell=lstm_cell,
+                       lstm_outgate=lstm_outgate,
+                       # RNN specific params
+                       rnn_W_in_to_hid=rnn_W_in_to_hid,
+                       rnn_W_hid_to_hid=rnn_W_hid_to_hid,
+                       rnn_b=rnn_b)
+    f_pred, f_train = getFunctions(input_var, target_var, class_balance_w_var,
+                                   l_out, weight_decay)
 
     # Reload the list of the value parameters
     # TODO Check if the saved params are CudaNDArrays or not, so that we
@@ -675,7 +678,7 @@ def train(saveto='model.npz',
                     # for i, v in enumerate(options['trng']):
                     #     trng.state_updates[i][0].set_value(v)
                     print('Model file loaded: {}'.format(s))
-                lasagne.layers.set_all_param_values(out_layer, bestparams_val)
+                lasagne.layers.set_all_param_values(l_out, bestparams_val)
 
                 break
             except IOError:
@@ -728,12 +731,12 @@ def train(saveto='model.npz',
             st = time.time()
 
             # Class balance
-            w = 1
+            class_balance_w = 1
             if class_balance in ['median_freq_cost', 'rare_freq_cost']:
-                w = np.sum(w_freq[targets_flat]).astype(floatX)
+                class_balance_w = np.sum(w_freq[targets_flat]).astype(floatX)
 
             # Compute cost
-            cost = f_train(inputs, targets_flat, w)
+            cost = f_train(inputs, targets_flat, class_balance_w)
             ud = time.time() - st
 
             if np.isnan(cost):
@@ -846,10 +849,9 @@ def train(saveto='model.npz',
                         history_acc)[:, 3].max():
 
                     # TODO check if CUDA variables!
-                    bestparams = lasagne.layers.get_all_param_values(out_layer)
+                    bestparams = lasagne.layers.get_all_param_values(l_out)
                     patience_counter = 0
-                    # Save model params
-                    save = True
+                    save = True  # Save model params
 
                 # Early stop if patience is over
                 if (eidx > min_epochs):
@@ -862,14 +864,10 @@ def train(saveto='model.npz',
             if save or np.mod(uidx, saveFreq) == 0:
                 save_time = time.time()
                 print 'Saving the parameters of the model...',
-                lastparams = lasagne.layers.get_all_param_values(out_layer)
+                lastparams = lasagne.layers.get_all_param_values(l_out)
                 vparams = [lastparams, bestparams]
                 # Retry if filesystem is busy
                 save_with_retry(saveto[0], vparams)
-                # if normalization:
-                #     numpy.savez('%s.norm.npz' % saveto,
-                #                 values=[np.get_value() for np in
-                #                         nparams[0] + nparams[1]])
                 save = False
                 print 'Done in {:.3f}s'.format(time.time() - save_time)
 
