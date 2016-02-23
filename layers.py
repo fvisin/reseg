@@ -206,9 +206,6 @@ class ReSegLayer(lasagne.layers.Layer):
             for i, (nf, f_size, stride) in enumerate(
                     zip(in_nfilters, in_filters_size, in_filters_stride)):
 
-                # TODO: not sure that this is true..
-                # abstract2DConv is working or not?
-
                 l_in = ConvLayer(
                     l_in,
                     num_filters=nf,
@@ -265,23 +262,20 @@ class ReSegLayer(lasagne.layers.Layer):
             # Print shape
             out_shape = get_output_shape(l_renet)
             n_rnns = 2 if stack_sublayers[lidx] else 4
+            # TODO Fix message
             print('ReNet: After {} rnns {}x{} @ {}: {}'.format(
                 n_rnns, pheight[lidx], pwidth[lidx], dim_proj[lidx],
                 out_shape))
 
         # Upsampling
         if out_upsampling_type == 'autograd':
+            raise NotImplementedError(
+                'This will not work as the dynamic cropping will crop '
+                'part of the image.')
             nlayers = len(out_nfilters)
             assert nlayers > 1
 
             # Compute the upsampling ratio and the corresponding params
-            # downsampled_size = np.array(
-            #    to_float(get_output_shape(l_renet)[1:3]))
-            # upsampled_size = np.array(to_float(
-            #    np.array(get_all_layers(l_renet)[0].shape[1:3]) +
-            #    get_equivalent_input_padding(l_renet)))
-            # up_ratio = (upsampled_size / downsampled_size) ** (
-            #            1. / nlayers)
             h2 = np.array((100., 100.))
             up_ratio = (h2 / self.hypotetical_fm_size) ** (1. / nlayers)
             h1 = h2 / up_ratio
@@ -307,17 +301,13 @@ class ReSegLayer(lasagne.layers.Layer):
 
                 # Print shape
                 out_shape = get_output_shape(l_upsampling)
-                print('Autograd: {}x{} (str {}x{}) @ {}:{}'.format(
+                print('Transposed autograd: {}x{} (str {}x{}) @ {}:{}'.format(
                     filter_size[0], filter_size[1], stride[0], stride[1],
                     out_nfilters[l], out_shape))
 
                 # CROP
                 # pad in DeconvLayer cannot be a tensor --> we cannot
                 # crop unless we know in advance by how much!
-                # upsampled_size = np.array(to_float(
-                #    np.array(get_all_layers(l_renet)[0].shape[1:3]) +
-                #    get_equivalent_input_padding(l_renet)))
-                # TODO last layer check
                 crop = T.max(T.stack([up_shape - target_shape, T.zeros(2)]),
                              axis=0)
                 crop = crop.astype('uint8')  # round down
