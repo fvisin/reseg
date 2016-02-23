@@ -1051,8 +1051,8 @@ class CropLayer(lasagne.layers.Layer):
                                 sz[3], -crop[1] + crop[1]/2)
                 return input_arr[:, :, crop[0]/2:idx0, crop[1]/2:idx1]
             else:
-                idx0 = T.switch(T.eq(crop[0], 0), sz[2], crop[0])
-                idx1 = T.switch(T.eq(crop[1], 0), sz[3], crop[1])
+                idx0 = T.switch(T.eq(crop[0], 0), sz[2], -crop[0])
+                idx1 = T.switch(T.eq(crop[1], 0), sz[3], -crop[1])
                 return input_arr[:, :, :idx0, :idx1]
         else:
             if self.centered:
@@ -1062,6 +1062,6 @@ class CropLayer(lasagne.layers.Layer):
                                 sz[2], -crop[1] + crop[1]/2)
                 return input_arr[:, crop[0]/2:idx0, crop[1]/2:idx1, :]
             else:
-                idx0 = T.switch(T.eq(crop[0], 0), sz[1], crop[0])
-                idx1 = T.switch(T.eq(crop[1], 0), sz[2], crop[1])
+                idx0 = T.switch(T.eq(crop[0], 0), sz[1], -crop[0])
+                idx1 = T.switch(T.eq(crop[1], 0), sz[2], -crop[1])
                 return input_arr[:, :idx0, :idx1, :]
