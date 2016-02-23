@@ -158,12 +158,21 @@ def buildReSeg(input_shape, input_var,
                          name='reseg')
 
     # Crop
-    # TODO DO we need it?
     target_size = get_output(l_in).shape[2:]
     crop = get_output(l_reseg).shape[2:] - target_size
     # crop = get_equivalent_input_padding(l_reseg)
     l_out = CropLayer(l_reseg, crop, centered=False)
 
+    # channel = nclasses
+    l_out = lasagne.layers.Conv2DLayer(
+        l_out,
+        num_filters=nclasses,
+        filter_size=(1, 1),
+        stride=(1, 1),
+        W=out_W_init,
+        b=out_b_init,
+        nonlinearity=None
+    )
     # Go to b01c
     l_out = lasagne.layers.DimshuffleLayer(
         l_out,
@@ -539,11 +548,6 @@ def train(saveto='model.npz',
     filenames_train, filenames_valid, filenames_test = filenames
     cheight, cwidth, cchannels = x_train[0].shape
     nclasses = max([np.max(el) for el in y_train]) + 1
-
-    # TODO Do we still need it?
-    # if out_nfilters[-1] != nclasses:
-    #     raise RuntimeError('The last element of out_nfilters should be'
-    #                        '%d' % nclasses)
     print '# of classes:', nclasses
 
     # Class balancing
