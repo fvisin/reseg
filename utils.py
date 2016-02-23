@@ -10,7 +10,7 @@ from skimage.color import label2rgb
 from skimage.io import imsave
 import theano
 
-from config_datasets import color_list_datasets
+from config_datasets import colormap_datasets
 
 floatX = theano.config.floatX
 
@@ -54,12 +54,11 @@ def validate(f_pred,
              data,
              batchsize,
              nclasses=2,
-             rng=None,
-             n_save=-1,
+             samples_ids=-1,
              dataset='camvid',
              saveto='test_lasagne',
              mean=None, std=None, fullmasks=None,
-             void_is_present=True, save_seg=True,
+             void_is_present=False,
              filenames=None, folder_dataset='pred'):
     """validate
 
@@ -73,7 +72,7 @@ def validate(f_pred,
         The
     nclasses :
         The
-    shuffle :
+    samples_ids :
         The
     dataset :
         The
@@ -88,8 +87,6 @@ def validate(f_pred,
     void_is_present :
         In some dataset there are some unlabeled pixels that we don't consider
         in the evalution metrics
-    save_seg :
-        If True the predicted segmentation mask will be saved
     filenames :
         The
     folder_dataset :
@@ -107,62 +104,50 @@ def validate(f_pred,
         * Intersection Over Union Indexes for each class
         * Intersection Over Union Index
     """
-    print >>sys.stderr, 'Prediction: ',
+    print >>sys.stderr, 'Prediction {}: '.format(folder_dataset),
 
-    if save_seg:
-
+    if samples_ids.size > 0:
         name = dataset
         seg_path = os.path.join('segmentations', name,
                                 saveto.split('/')[-1][:-4])
         # gt_path = os.path.join('gt', name, saveto.split('/')[-1][:-4])
         # img_path = os.path.join('img', name, saveto.split('/')[-1][:-4])
-        color_list = color_list_datasets[name]
+        colormap = colormap_datasets[name]
 
     inputs, targets = data
     conf_matrix = np.zeros([nclasses, nclasses])
 
-    idx = 0
+    im_idx = 0
     for minibatch in iterate_minibatches(inputs,
                                          targets,
                                          batchsize,
                                          shuffle=False):
-        x, y, mini_idx = minibatch
-        x = img_as_float(x)
-        f = filenames[mini_idx]
-        preds = f_pred(x.astype(floatX))
+        mini_x, mini_y, mini_idx = minibatch
+        mini_x = img_as_float(mini_x)
+        mini_f = filenames[mini_idx]
+        preds = f_pred(mini_x.astype(floatX))
 
-        print >>sys.stderr, '.',
-
-        # computing the confusion matrix for each image
-        cf_m = confusion_matrix(y.flatten(), preds.flatten(),
+        # Compute the confusion matrix for each image
+        cf_m = confusion_matrix(mini_y.flatten(), preds.flatten(),
                                 range(0, nclasses))
         conf_matrix += cf_m
 
-        if save_seg:
-            for im_pred, mini_x, mini_y, filename in zip(preds, x, y, f):
-
-                # save a random set or the entire dataset
-                if np.logical_or((idx in n_save), (idx == -1)):
-
-                    # fix for daimler dataset
-                    filename = filename.replace(".pgm", ".png")
+        # Save samples
+        if samples_ids.size > 0:
+            for pred, x, y, f in zip(preds, mini_x, mini_y, mini_f):
+                if (im_idx in samples_ids or samples_ids == [-1]):
+                    # TODO fix daimler dataset --> Marco fix the dataset!
+                    # f = f.replace(".pgm", ".png")
                     # save Image + GT + prediction
-                    base = os.path.basename(filename)
-                    im_pred_rgb = label2rgb(im_pred, colors=color_list)
-                    mini_y_rgb = label2rgb(mini_y, colors=color_list)
-                    im_save = np.concatenate(
-                            (mini_x,
-                             mini_y_rgb,
-                             im_pred_rgb),
-                            axis=1)
-                    outpath = os.path.join(seg_path, folder_dataset, base)
-                    save_image(outpath, im_save)
-                idx += 1
+                    im_name = os.path.basename(f)
+                    pred_rgb = label2rgb(pred, colors=colormap)
+                    y_rgb = label2rgb(y, colors=colormap)
+                    concat_img = np.concatenate((x, y_rgb, pred_rgb), axis=1)
+                    outpath = os.path.join(seg_path, folder_dataset, im_name)
+                    save_image(outpath, concat_img)
+                im_idx += 1
 
-    # [WARNING] : we don't consider the unlabelled pixels so the last
-    #             row or column of the confusion matrix are usually discarded
-
-    # Global Accuracy
+    # Compute metrics
     if void_is_present:
         correctly_classified_pxls = np.trace(conf_matrix[0:-1, 0:-1])
         pxls = np.sum(conf_matrix[0:-1, :])
@@ -199,9 +184,7 @@ def validate(f_pred,
 
     print >>sys.stderr, 'Done'
 
-    return (global_acc, conf_matrix,
-            cm_normalized, mean_class_acc,
-            iou_index, mean_iou_index)
+    return (global_acc, conf_matrix, mean_class_acc, iou_index, mean_iou_index)
 
 
 def zipp(vparams, params):

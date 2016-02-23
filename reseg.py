@@ -18,7 +18,7 @@ from theano import tensor as T
 from theano.compile.nanguardmode import NanGuardMode
 
 # Local application/library specific imports
-from config_datasets import color_list_datasets
+from config_datasets import colormap_datasets
 from get_info_model import print_params
 from layers import CropLayer, ReSegLayer
 from subprocess import check_output
@@ -539,12 +539,12 @@ def train(saveto='model.npz',
 
     # Compute the indexes of the images to be saved
     if isinstance(n_save, collections.Iterable):
-        n_save = np.array(n_save)
+        samples_ids = np.array(n_save)
     elif isinstance(n_save, int):
         n_save = min(n_save, len(train[0]), len(valid[0]), len(test[0]))
-        n_save = np.arange(n_save)
-        rng.shuffle(n_save)
-    options['n_save'] = n_save
+        samples_ids = np.arange(n_save) if n_save != -1 else np.array([-1])
+        rng.shuffle(samples_ids)
+    options['samples_ids'] = samples_ids
 
     # Retrieve basic size informations and split train variables
     x_train, y_train = train
@@ -695,7 +695,7 @@ def train(saveto='model.npz',
     # Epochs loop
     for eidx in range(max_epochs):
         nsamples = 0
-        train_cost = 0
+        epoch_cost = 0
         start_time = time.time()
 
         # Minibatches loop
@@ -712,9 +712,6 @@ def train(saveto='model.npz',
             inputs = (inputs / 255.).astype(floatX)
             targets = targets.astype(intX)
             targets_flat = targets.flatten()
-
-            if np.mod(uidx, dispFreq) == 0:
-                print 'Image size: {}'.format(inputs.shape)
 
             # TODO: preprocess function
             # whiten, LCN, GCN, Local Mean Subtract, or normalize +
@@ -745,53 +742,46 @@ def train(saveto='model.npz',
                 raise RuntimeError('Inf detected')
 
             if np.mod(uidx, dispFreq) == 0:
-                print('Epoch {}, Update {}, Cost {}, DD {}, UD {}').format(
-                        eidx, uidx, round(cost, 5), round(dd), round(ud))
+                print('Epoch {}, Up {}, Cost {:.3f}, DD {:.3f}, UD ' +
+                      '{:.5f} {}').format(eidx, uidx, float(cost), dd, ud,
+                                          input_shape)
 
             def validate_model():
-                # NOTE : No need to suppress any stochastic layer such as
-                # Dropout, since f_pred exclude any non-deterministic layer
                 (train_global_acc,
                  train_conf_matrix,
-                 train_conf_matrix_norm,
                  train_mean_class_acc,
                  train_iou_index,
                  train_mean_iou_index) = validate(f_pred,
                                                   train,
                                                   valid_batch_size,
                                                   nclasses,
-                                                  rng=rng,
-                                                  n_save=n_save,
+                                                  samples_ids=samples_ids,
                                                   filenames=filenames_train,
                                                   folder_dataset='train',
                                                   dataset=dataset,
                                                   saveto=saveto[0])
                 (valid_global_acc,
                  valid_conf_matrix,
-                 valid_conf_matrix_norm,
                  valid_mean_class_acc,
                  valid_iou_index,
                  valid_mean_iou_index) = validate(f_pred,
                                                   valid,
                                                   valid_batch_size,
                                                   nclasses,
-                                                  rng=rng,
-                                                  n_save=n_save,
+                                                  samples_ids=samples_ids,
                                                   filenames=filenames_valid,
                                                   folder_dataset='valid',
                                                   dataset=dataset,
                                                   saveto=saveto[0])
                 (test_global_acc,
                  test_conf_matrix,
-                 test_conf_matrix_norm,
                  test_mean_class_acc,
                  test_iou_index,
                  test_mean_iou_index) = validate(f_pred,
                                                  test,
                                                  valid_batch_size,
                                                  nclasses,
-                                                 rng=rng,
-                                                 n_save=n_save,
+                                                 samples_ids=samples_ids,
                                                  filenames=filenames_test,
                                                  folder_dataset='test',
                                                  dataset=dataset,
@@ -823,10 +813,7 @@ def train(saveto='model.npz',
                                     test_mean_class_acc,
                                     test_mean_iou_index])
 
-                history_conf_matrix.append([train_conf_matrix_norm,
-                                           valid_conf_matrix_norm,
-                                           test_conf_matrix_norm,
-                                           train_conf_matrix,
+                history_conf_matrix.append([train_conf_matrix,
                                            valid_conf_matrix,
                                            test_conf_matrix])
 
@@ -863,21 +850,19 @@ def train(saveto='model.npz',
             # Save model parameters
             if save or np.mod(uidx, saveFreq) == 0:
                 save_time = time.time()
-                print 'Saving the parameters of the model...',
                 lastparams = lasagne.layers.get_all_param_values(l_out)
                 vparams = [lastparams, bestparams]
                 # Retry if filesystem is busy
                 save_with_retry(saveto[0], vparams)
                 save = False
-                print 'Done in {:.3f}s'.format(time.time() - save_time)
-
-                print "Saving the options to {}".format(saveto[0])
                 pkl.dump(options,
                          open('%s.pkl' % saveto[0], 'wb'))
+                print 'Saved parameters and options in {} in {:.3f}s'.format(
+                    saveto[0], time.time() - save_time)
 
-            train_cost += cost
+            epoch_cost += cost
 
-            # exit minibatchs loop
+            # exit minibatches loop
             if estop:
                 break
 
@@ -886,8 +871,8 @@ def train(saveto='model.npz',
             break
 
         print 'Seen %d samples' % nsamples
-        print("Epoch {} of {} took {:.3f}s".format(
-            eidx + 1, max_epochs, time.time() - start_time))
+        print("Epoch {} of {} took {:.3f}s with overall cost {:.3f}".format(
+            eidx + 1, max_epochs, time.time() - start_time, epoch_cost))
 
     validate_model()
     max_valid_idx = np.argmax(np.array(history_acc)[:, 3])
@@ -931,7 +916,7 @@ def show_seg(dataset_name, n_exp, dataset_set, mode='sequential', id=-1):
 
     # now go in the default directory to retrieve all the prediction masks
     name = options['dataset']
-    color_list = color_list_datasets[name]
+    color_list = colormap_datasets[name]
 
     print("Loading data ...")
     load_data, properties = get_dataset(name)

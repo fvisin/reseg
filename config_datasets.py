@@ -37,11 +37,11 @@ nclasses = 1000
 color_bins = np.linspace(0, 1, nclasses)
 norm = mpl.colors.Normalize(vmin=0, vmax=1)
 m = cm.ScalarMappable(norm=norm, cmap=plt.get_cmap('Pastel2'))
-color_labels_coco = m.to_rgba(color_bins)[:, :3]
+colormap_coco = m.to_rgba(color_bins)[:, :3]
 
 
 # ##### DAIMLER ##### #
-color_labels_daimler = OrderedDict([
+colormap_daimler = OrderedDict([
     (0, np.array([128, 64, 128], dtype=np.uint8)),  # ground
     (1, np.array([64, 0, 128], dtype=np.uint8)),  # vehicle
     (2, np.array([64, 64, 0], dtype=np.uint8)),  # pedestrian
@@ -54,7 +54,7 @@ headers_daimler = ["Ground", "Vehicle", "Pedestrian", "Sky",
                    "Building", "Void"]
 
 # ##### KITTI ROAD ##### #
-color_labels_kitti_road = OrderedDict([
+colormap_kitti_road = OrderedDict([
     (0, np.array([128, 64, 128], dtype=np.uint8)),  # non road
     (1, np.array([64, 0, 128], dtype=np.uint8)),  # road
     (2, np.array([0, 0, 0], dtype=np.uint8))  # Unlabeled
@@ -63,7 +63,7 @@ color_labels_kitti_road = OrderedDict([
 headers_kitti_road = ["Road", "Non-road", "Void"]
 
 # ##### CAMVID ##### #
-color_labels_camvid = OrderedDict([
+colormap_camvid = OrderedDict([
     (0, np.array([128, 128, 128], dtype=np.uint8)),  # sky
     (1, np.array([128, 0, 0], dtype=np.uint8)),  # Building
     (2, np.array([192, 192, 128], dtype=np.uint8)),  # Pole
@@ -83,7 +83,7 @@ headers_camvid = ["Sky", "Building", "Column_Pole", "Road", "Sidewalk",
                   "Bicyclist", "Void"]
 
 # ##### FASHIONISTA ##### #
-color_labels_fashionista = OrderedDict([
+colormap_fashionista = OrderedDict([
     (0, np.array([128, 128, 128], dtype=np.uint8)),
     (1, np.array([128, 0, 0], dtype=np.uint8)),
     (2, np.array([192, 192, 128], dtype=np.uint8)),
@@ -145,14 +145,14 @@ color_labels_fashionista = OrderedDict([
 
 
 # ##### HORSES ##### #
-color_labels_flowers = OrderedDict([
+colormap_flowers = OrderedDict([
     (0, np.array([128, 64, 128], dtype=np.uint8)),  # non road
     (1, np.array([64, 0, 128], dtype=np.uint8)),  # road
     ])
 
 
 # ##### HORSES ##### #
-color_labels_horses = OrderedDict([
+colormap_horses = OrderedDict([
     (0, np.array([255, 255, 255], dtype=np.uint8)),  # Horse
     (1, np.array([0, 0, 0], dtype=np.uint8))  # Unlabeled
     ])
@@ -161,17 +161,16 @@ headers_horses = ["Horses", "Non-horses"]
 
 
 # DATASET DICTIONARIES #
-color_labels_datasets = dict()
-color_labels_datasets["camvid"] = color_labels_camvid
-color_labels_datasets["daimler"] = color_labels_daimler
-color_labels_datasets["fashionista"] = color_labels_fashionista
-color_labels_datasets["flowers"] = color_labels_flowers
-color_labels_datasets["kitti_road"] = color_labels_kitti_road
-color_labels_datasets["horses"] = color_labels_horses
+colormap_datasets = dict()
+colormap_datasets["camvid"] = colormap_camvid
+colormap_datasets["daimler"] = colormap_daimler
+colormap_datasets["fashionista"] = colormap_fashionista
+colormap_datasets["flowers"] = colormap_flowers
+colormap_datasets["kitti_road"] = colormap_kitti_road
+colormap_datasets["horses"] = colormap_horses
 
-color_list_datasets = dict()
-for key, value in color_labels_datasets.iteritems():
-    color_list_datasets[key] = np.asarray(
+for key, value in colormap_datasets.iteritems():
+    colormap_datasets[key] = np.asarray(
                     [z for z in zip(*value.items())[1]]) / 255.
 
 headers_datasets = dict()

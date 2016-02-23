@@ -13,7 +13,7 @@ from skimage.io import ImageCollection, imsave
 from skimage.transform import resize
 from itertools import izip
 
-from config_datasets import (color_list_datasets as colors_list)
+from config_datasets import (colormap_datasets as colors_list)
 from helper_dataset import zero_pad, \
     compare_mask_image_filenames, convert_RGB_mask_to_index, \
     rgb2illumination_invariant, save_image
