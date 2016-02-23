@@ -607,10 +607,10 @@ def train(saveto='model.npz',
         train, _, _, _, _ = load_data(
             resize_images=resize_images, resize_size=resize_size,
             color=color, color_space=color_space, rng=rng)
-        x_tag = (train[0][0:batch_size] / 255.).astype(floatX)
+        x_tag = (train[0][0:batch_size]).astype(floatX)
         y_tag = (train[1][0:batch_size]).astype(intX)
 
-        # Move preprocessing in a separate function
+        # TODO Move preprocessing in a separate function
         if x_tag.ndim == 1:
             x_tag = x_tag[0]
             y_tag = y_tag[0]
@@ -709,7 +709,7 @@ def train(saveto='model.npz',
             nsamples += len(inputs)
             uidx += 1
 
-            inputs = (inputs / 255.).astype(floatX)
+            inputs = inputs.astype(floatX)
             targets = targets.astype(intX)
             targets_flat = targets.flatten()
 
