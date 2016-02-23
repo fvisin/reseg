@@ -321,6 +321,7 @@ class ReSegLayer(lasagne.layers.Layer):
                 print('Dynamic cropping')
 
         elif out_upsampling_type == 'grad':
+            l_upsampling = l_renet
             for i, (nf, f_size, stride) in enumerate(zip(
                     out_nfilters, out_filters_size, out_filters_stride)):
                 l_upsampling = DeconvLayer(
@@ -328,8 +329,6 @@ class ReSegLayer(lasagne.layers.Layer):
                     num_filters=nf,
                     filter_size=f_size,
                     stride=stride,
-                    # pad='same',
-                    # untie_biases=False,
                     W=out_W_init,
                     b=out_b_init,
                     nonlinearity=out_nonlinearity)
@@ -337,7 +336,7 @@ class ReSegLayer(lasagne.layers.Layer):
 
                 # Print shape
                 out_shape = get_output_shape(l_upsampling)
-                print('Grad: {}x{} (str {}x{}) @ {}: {}'.format(
+                print('Transposed grad: {}x{} (str {}x{}) @ {}: {}'.format(
                     f_size[0], f_size[1], stride[0], stride[1], nf, out_shape))
 
         elif out_upsampling_type == 'linear':
