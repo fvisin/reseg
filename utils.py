@@ -99,7 +99,6 @@ def validate(f_pred,
     inout dataset:
         * Global Pixel Accuracy
         * Confusion Matrix
-        * Normalized Confusion Matrix
         * Mean Class Accuracy (Mean of the diagonal of Norm Conf Matrix)
         * Intersection Over Union Indexes for each class
         * Intersection Over Union Index
@@ -135,7 +134,8 @@ def validate(f_pred,
         # Save samples
         if samples_ids.size > 0:
             for pred, x, y, f in zip(preds, mini_x, mini_y, mini_f):
-                if (im_idx in samples_ids or samples_ids == [-1]):
+                if (im_idx in samples_ids or (len(samples_ids) == 1 and
+                                              samples_ids == [-1])):
                     # TODO fix daimler dataset --> Marco fix the dataset!
                     # f = f.replace(".pgm", ".png")
                     # save Image + GT + prediction
