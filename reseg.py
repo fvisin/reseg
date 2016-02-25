@@ -1,7 +1,7 @@
 # Standard library imports
 import cPickle as pkl
 import collections
-import matplotlib.pyplot as plt
+# import matplotlib.pyplot as plt
 import os
 import random
 from shutil import move
@@ -12,15 +12,15 @@ import time
 import lasagne
 from lasagne.layers import get_output
 import numpy as np
-from skimage.data import load
-from skimage.color import label2rgb
+# from skimage.data import load
+# from skimage.color import label2rgb
 import theano
 from theano import tensor as T
 from theano.compile.nanguardmode import NanGuardMode
 
 # Local application/library specific imports
 from helper_dataset import preprocess_dataset
-from config_datasets import colormap_datasets
+# from config_datasets import colormap_datasets
 from get_info_model import print_params
 from layers import CropLayer, ReSegLayer
 from subprocess import check_output
@@ -1075,58 +1075,8 @@ def show_seg(dataset_name, n_exp, dataset_set, mode='sequential', id=-1):
         images = test[0]
         gt = test[1]
 
-
-    # TODO: we need a single function with alla the params to create the
-    # model so we call it from train or from show_seg
-
-
-
-    out_layer, f_pred = buildReSeg(input_shape, input_var,
-                                   n_layers, pheight, pwidth,
-                                   dim_proj, nclasses, stack_sublayers,
-                                   # upsampling
-                                   out_upsampling,
-                                   out_nfilters,
-                                   out_filters_size,
-                                   out_filters_stride,
-                                   out_W_init=out_W_init,
-                                   out_b_init=out_b_init,
-                                   out_nonlinearity=out_nonlinearity,
-                                   # input ConvLayers
-                                   in_nfilters=in_nfilters,
-                                   in_filters_size=in_filters_size,
-                                   in_filters_stride=in_filters_stride,
-                                   in_W_init=in_W_init,
-                                   in_b_init=in_b_init,
-                                   in_nonlinearity=in_nonlinearity,
-                                   # common recurrent layer params
-                                   RecurrentNet=RecurrentNet,
-                                   nonlinearity=nonlinearity,
-                                   hid_init=hid_init,
-                                   grad_clipping=grad_clipping,
-                                   precompute_input=precompute_input,
-                                   mask_input=mask_input,
-                                   # 1x1 Conv layer for dimensional reduction
-                                   conv_dim_red=conv_dim_red,
-                                   conv_dim_red_nonlinearity=
-                                   conv_dim_red_nonlinearity,
-                                   # GRU specific params
-                                   gru_resetgate=gru_resetgate,
-                                   gru_updategate=gru_updategate,
-                                   gru_hidden_update=gru_hidden_update,
-                                   gru_hid_init=gru_hid_init,
-                                   # LSTM specific params
-                                   lstm_ingate=lstm_ingate,
-                                   lstm_forgetgate=lstm_forgetgate,
-                                   lstm_cell=lstm_cell,
-                                   lstm_outgate=lstm_outgate,
-                                   # RNN specific params
-                                   rnn_W_in_to_hid=rnn_W_in_to_hid,
-                                   rnn_W_hid_to_hid=rnn_W_hid_to_hid,
-                                   rnn_b=rnn_b,
-                                   # special layers
-                                   batch_norm=batch_norm
-                                   )
+    # TODO: use buildReSeg()
+    out_layer = [id_f, images, gt, seg_path]  # DELETEME!
 
     # load params
     with np.load('model.npz') as f:
