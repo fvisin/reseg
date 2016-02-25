@@ -109,8 +109,7 @@ def validate(f_pred,
     if len(data) == 0:
         return 0., [], [], 0., [], 0.
 
-
-    if samples_ids.size > 0:
+    if len(samples_ids) > 0:
         name = dataset
         seg_path = os.path.join('segmentations', name,
                                 saveto.split('/')[-1][:-4])
@@ -142,7 +141,7 @@ def validate(f_pred,
         conf_matrix += cf_m
 
         # Save samples
-        if samples_ids.size > 0:
+        if len(samples_ids) > 0:
             for pred, x, y, f in zip(preds, mini_x, mini_y, mini_f):
                 if (im_idx in samples_ids or (len(samples_ids) == 1 and
                                               samples_ids == [-1])):
