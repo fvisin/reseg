@@ -653,6 +653,8 @@ def train(saveto='model.npz',
 
     # Retrieve basic size informations and split train variables
     x_train, y_train = train
+    if len(x_train) == 0:
+        raise RuntimeError("Dataset not found")
     filenames_train, filenames_valid, filenames_test = filenames
     cheight, cwidth, cchannels = x_train[0].shape
     nclasses = max([np.max(el) for el in y_train]) + 1
