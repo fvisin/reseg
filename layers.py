@@ -205,8 +205,6 @@ class ReSegLayer(lasagne.layers.Layer):
         self.name = name
         self.sublayers = []
 
-        (batch_size, cheight, cwidth, cchannels) = get_output_shape(l_in)
-
         # Input ConvLayers
         if isinstance(in_nfilters, Iterable) and not isinstance(in_nfilters,
                                                                 str):
@@ -570,7 +568,7 @@ class ReNetLayer(lasagne.layers.Layer):
         self.stride = self.patch_size  # for now, it's not parametrized
 
         batch_size = -1
-        cheight, cwidth, cchannels = get_output_shape(l_in)[1:]
+        cchannels, cheight, cwidth = get_output_shape(l_in)[1:]
 
         # Dynamically add padding if the input is not a multiple of the
         # patch size (expected input format: bs, ch, rows, cols)
