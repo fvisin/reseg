@@ -899,20 +899,18 @@ def train(saveto='model.npz',
                                                  dataset=dataset,
                                                  saveto=saveto[0])
                 print("")
-                print("Global Accuracies :")
-                print('Train ', train_global_acc,
-                      'Valid ', valid_global_acc,
-                      'Test ', test_global_acc)
-                print("")
-                print("Class Accuracies :")
-                print('Train ', train_mean_class_acc,
-                      'Valid ', valid_mean_class_acc,
-                      'Test ', test_mean_class_acc)
-                print("")
-                print("Mean Intersection Over Union :")
-                print('Train ', train_mean_iou_index,
-                      'Valid ', valid_mean_iou_index,
-                      'Test ', test_mean_iou_index)
+                print("Global Accuracies:")
+                print('Train {:.5f} Valid {:.5f} Test {:.5f}'.format(
+                    train_global_acc, valid_global_acc, test_global_acc))
+
+                print("Mean Class Accuracy:")
+                print('Train {:.5f} Valid {:.5f} Test {:.5f}'.format(
+                    train_mean_class_acc, valid_mean_class_acc,
+                    test_mean_class_acc))
+
+                print('Train {:.5f} Valid {:.5f} Test {:.5f}'.format(
+                    train_mean_iou_index, valid_mean_iou_index,
+                    test_mean_iou_index))
                 print("")
 
                 history_acc.append([train_global_acc,
@@ -1000,12 +998,11 @@ def train(saveto='model.npz',
     validate_model()
     max_valid_idx = np.argmax(np.array(history_acc)[:, 3])
     best = history_acc[max_valid_idx]
-    best = (round(best[0], 5), round(best[3], 5), round(best[6], 5),
-            round(best[7], 5), round(best[8], 5))
     print("Global Accuracies :")
-    print 'Best: Train ', best[0], 'Valid ', best[1], 'Test ', best[2]
-    print("Test Mean Class Accuracy:", best[3])
-    print("Test Mean Intersection Over Union:", best[4])
+    print('Best: Train {:.5f} Valid {:.5f} Test {:.5f}'.format(
+        best[0], best[3], best[6]))
+    print("Test Mean Class Accuracy: {}".format(best[7]))
+    print("Test Mean Intersection Over Union: {}".format(best[8]))
 
     if len(saveto) != 1:
         print("Moving temporary model files to {}".format(saveto[1]))
