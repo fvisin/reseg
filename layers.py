@@ -567,9 +567,6 @@ class ReNetLayer(lasagne.layers.Layer):
         self.name = name
         self.stride = self.patch_size  # for now, it's not parametrized
 
-        batch_size = -1
-        cchannels, cheight, cwidth = get_output_shape(l_in)[1:]
-
         # Dynamically add padding if the input is not a multiple of the
         # patch size (expected input format: bs, ch, rows, cols)
         l_in = DynamicPaddingLayer(l_in, patch_size, self.stride,
@@ -577,6 +574,7 @@ class ReNetLayer(lasagne.layers.Layer):
 
         # get_output(l_in).shape will result in an error in the
         # recurrent layers
+        batch_size = -1
         cchannels, cheight, cwidth = get_output_shape(l_in)[1:]
         pheight, pwidth = patch_size
         psize = pheight * pwidth * cchannels
@@ -637,14 +635,15 @@ class ReNetLayer(lasagne.layers.Layer):
             rnn_W_hid_to_hid=rnn_W_hid_to_hid,
             rnn_b=rnn_b,
             name=self.name + "_sub0_renetsub")
+        psize = 2 * n_hidden
 
         # Revert reshape: #W, #H, bs, 2*hid
         l_sub0 = lasagne.layers.ReshapeLayer(
             l_sub0,
-            (npatchesW, npatchesH, batch_size, 2*n_hidden),
+            (npatchesW, npatchesH, batch_size, psize),
             name=self.name + "_sub0_unreshape")
 
-        # Invert rows and columns: #H, #W, bs, psize
+        # Invert rows and columns: #H, #W, bs, 2*hid
         l_sub0 = lasagne.layers.DimshuffleLayer(
             l_sub0,
             (1, 0, 2, 3),
@@ -656,11 +655,10 @@ class ReNetLayer(lasagne.layers.Layer):
         if stack_sublayers:
             # #H, #W, bs, 2*hid
             input_sublayer1 = l_sub0
-            psize = 2 * n_hidden
         else:
             # #W, #H, bs, psize
             input_sublayer1 = l_in
-            cchannels = cchannels * pwidth * pheight
+            psize = cchannels * pwidth * pheight
 
             # Invert rows and columns: #H, #W, bs, psize
             input_sublayer1 = lasagne.layers.DimshuffleLayer(
@@ -700,18 +698,19 @@ class ReNetLayer(lasagne.layers.Layer):
             rnn_W_hid_to_hid=rnn_W_hid_to_hid,
             rnn_b=rnn_b,
             name=self.name + "_sub1_renetsub")
+        psize = 2 * n_hidden
 
         # Revert the reshape: #H, #W, bs, 2*hid
         l_sub1 = lasagne.layers.ReshapeLayer(
             l_sub1,
-            (npatchesH, npatchesW, batch_size, 2*n_hidden),
+            (npatchesH, npatchesW, batch_size, psize),
             name=self.name + "_sub1_unreshape")
 
         # Concat all 4 layers if needed: #H, #W, bs, {2,4}*hid
         if not stack_sublayers:
             l_sub1 = lasagne.layers.ConcatLayer([l_sub0, l_sub1], axis=3)
 
-        # Get back to bc01
+        # Get back to bc01: bs, psize, #H, #W
         self.out_layer = lasagne.layers.DimshuffleLayer(
             l_sub1,
             (2, 3, 0, 1),
