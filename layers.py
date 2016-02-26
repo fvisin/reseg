@@ -231,6 +231,13 @@ class ReSegLayer(lasagne.layers.Layer):
                              out_shape[3], out_shape[1])
                 print('RecSeg: After in-convnet: {}'.format(out_shape))
 
+        # Pretrained vgg16
+        elif in_nfilters == 'vgg':
+            from vgg16 import buildVgg16
+            l_vgg16 = buildVgg16(l_in, 'conv3_3', False)
+            hypotetical_fm_size /= 4
+            l_in = l_vgg16
+
         # ReNet layers
         l_renet = l_in
         for lidx in xrange(n_layers):

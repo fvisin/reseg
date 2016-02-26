@@ -121,13 +121,6 @@ def buildReSeg(input_shape, input_var,
     hypotetical_fm_size = np.array((100.0, 100.0))
     l_conv = l_in
 
-    # Pretrained vgg16
-    if in_nfilters == 'vgg':
-        from vgg16 import buildVgg16
-        l_vgg16 = buildVgg16(l_in, 'conv3_3', False)
-        hypotetical_fm_size /= 4
-        l_conv = l_vgg16
-
     l_reseg = ReSegLayer(l_conv, n_layers, pheight, pwidth, dim_proj,
                          nclasses, stack_sublayers,
                          # upsampling
