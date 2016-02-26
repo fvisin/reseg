@@ -205,6 +205,8 @@ class ReSegLayer(lasagne.layers.Layer):
         self.name = name
         self.sublayers = []
 
+        expand_height = expand_width = 1
+
         # Input ConvLayers
         if isinstance(in_nfilters, Iterable) and not isinstance(in_nfilters,
                                                                 str):
@@ -224,6 +226,8 @@ class ReSegLayer(lasagne.layers.Layer):
                 self.sublayers.append(l_in)
                 self.hypotetical_fm_size = (
                     (self.hypotetical_fm_size - 1) * stride + f_size)
+                expand_height *= f_size[0]
+                expand_width *= f_size[1]
 
                 # Print shape
                 out_shape = get_output_shape(l_in)
@@ -236,6 +240,7 @@ class ReSegLayer(lasagne.layers.Layer):
             from vgg16 import buildVgg16
             l_vgg16 = buildVgg16(l_in, 'conv3_3', False)
             hypotetical_fm_size /= 4
+            expand_height = expand_width = 4
             l_in = l_vgg16
 
         # ReNet layers
@@ -392,8 +397,8 @@ class ReSegLayer(lasagne.layers.Layer):
                 name=self.name + '_grad_undimshuffle')
             self.sublayers.append(l_upsampling)
 
-            expand_height = np.prod(pheight)
-            expand_width = np.prod(pwidth)
+            expand_height *= np.prod(pheight)
+            expand_width *= np.prod(pwidth)
             l_upsampling = LinearUpsamplingLayer(l_upsampling,
                                                  expand_height,
                                                  expand_width,
