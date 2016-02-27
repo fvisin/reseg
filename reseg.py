@@ -1015,6 +1015,9 @@ def train(saveto='model.npz',
 
     if len(saveto) != 1:
         print("Moving temporary model files to {}".format(saveto[1]))
+        dirname = os.path.dirname(saveto[1])
+        if not os.path.exists(dirname):
+            os.makedirs(dirname)
         move(saveto[0], saveto[1])
         move(saveto[0] + '.pkl', saveto[1] + '.pkl')
 
