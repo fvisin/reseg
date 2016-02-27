@@ -180,11 +180,14 @@ path_mapping = os.path.join(
     'classMapping40.mat'
 )
 
-f = sio.loadmat(path_mapping,
-                squeeze_me=True,
-                struct_as_record=False)
-headers_nyu_depth40 = np.append(
-    [ff.encode("utf-8") for ff in f['className']], "Void").tolist()
+try:
+    f = sio.loadmat(path_mapping,
+                    squeeze_me=True,
+                    struct_as_record=False)
+    headers_nyu_depth40 = np.append(
+        [ff.encode("utf-8") for ff in f['className']], "Void").tolist()
+except IOError:
+    headers_nyu_depth40 = []
 
 
 # 4 Super Class
@@ -202,11 +205,14 @@ path_mapping = os.path.join(
     'classMapping04.mat'
 )
 
-f = sio.loadmat(path_mapping,
-                squeeze_me=True,
-                struct_as_record=False)
-headers_nyu_depth04 = np.append(
-    [ff.encode("utf-8") for ff in f['className']], "Void").tolist()
+try:
+    f = sio.loadmat(path_mapping,
+                    squeeze_me=True,
+                    struct_as_record=False)
+    headers_nyu_depth04 = np.append(
+        [ff.encode("utf-8") for ff in f['className']], "Void").tolist()
+except IOError:
+    headers_nyu_depth04 = []
 
 
 # ##### SUNRGBD ##### #
@@ -222,12 +228,14 @@ path_classlabels = os.path.join(
     os.path.expanduser('~/exp/datasets/SUNRGBD/'),
     'SUNRGBDtoolbox/Metadata/seg37list.mat')
 
-f = sio.loadmat(path_classlabels,
-                squeeze_me=True,
-                struct_as_record=False)
-headers_sunrgbd = np.append(
-    [ff.encode("utf-8") for ff in f['seg37list']], "Void").tolist()
-
+try:
+    f = sio.loadmat(path_classlabels,
+                    squeeze_me=True,
+                    struct_as_record=False)
+    headers_sunrgbd = np.append(
+        [ff.encode("utf-8") for ff in f['seg37list']], "Void").tolist()
+except IOError:
+    headers_sunrgbd = []
 
 # DATASET DICTIONARIES #
 colormap_datasets = dict()
@@ -254,4 +262,3 @@ headers_datasets["horses"] = headers_horses
 headers_datasets["nyu_depth04"] = headers_nyu_depth04
 headers_datasets["nyu_depth40"] = headers_nyu_depth40
 headers_datasets["sunrgbd"] = headers_sunrgbd
-
