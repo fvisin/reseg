@@ -1,10 +1,11 @@
 from collections import OrderedDict
 import os
-import sys
 
 import numpy as np
+from progressbar import Bar, FormatLabel, Percentage, ProgressBar, Timer
+from progressbar.widgets import FormatWidgetMixin, WidthWidgetMixin
 from retrying import retry
-from skimage import img_as_float
+from skimage import img_as_float, img_as_ubyte
 from sklearn.metrics import confusion_matrix
 from skimage.color import label2rgb, gray2rgb
 from skimage.io import imsave
@@ -47,7 +48,7 @@ def save_image(outpath, img):
         if e.errno != errno.EEXIST:
             raise e
         pass
-    imsave(outpath, img)
+    imsave(outpath, img_as_ubyte(img))
 
 
 def validate(f_pred,
@@ -55,7 +56,7 @@ def validate(f_pred,
              batchsize,
              preprocess_type=None,
              nclasses=2,
-             samples_ids=-1,
+             samples_ids=[],
              dataset='camvid',
              saveto='test_lasagne',
              mean=None, std=None, fullmasks=None,
@@ -97,38 +98,41 @@ def validate(f_pred,
     Returns
     -------
     The function returns the following performance indexes computed on the
-    inout dataset:
+    input dataset:
         * Global Pixel Accuracy
         * Confusion Matrix
         * Mean Class Accuracy (Mean of the diagonal of Norm Conf Matrix)
         * Intersection Over Union Indexes for each class
         * Intersection Over Union Index
     """
-    print >>sys.stderr, 'Prediction {}: '.format(folder_dataset),
     # check if the dataset is empty
-    if len(data) == 0:
+    if len(data) == 0 or len(samples_ids) == 0:
         return 0., [], [], 0., [], 0.
 
-    if len(samples_ids) > 0:
-        name = dataset
-        seg_path = os.path.join('segmentations', name,
-                                saveto.split('/')[-1][:-4])
-        # gt_path = os.path.join('gt', name, saveto.split('/')[-1][:-4])
-        # img_path = os.path.join('img', name, saveto.split('/')[-1][:-4])
+    name = dataset
+    seg_path = os.path.join('segmentations', name,
+                            saveto.split('/')[-1][:-4])
 
-        # hack for nyu because now I don't have the time to better think
-        if name == 'nyu_depth':
-            name = 'nyu_depth40' if nclasses == 41 else 'nyu_depth04'
-        colormap = colormap_datasets[name]
+    # hack for nyu because now I don't have the time to better think
+    if name == 'nyu_depth':
+        name = 'nyu_depth40' if nclasses == 41 else 'nyu_depth04'
+    colormap = colormap_datasets[name]
 
     inputs, targets = data
     conf_matrix = np.zeros([nclasses, nclasses]).astype('float32')
 
+    # Progressbar
+    n_imgs = inputs.shape[0]
+    bar_widgets = [
+        folder_dataset + ':', FormatLabel('%(value)d/' + str(n_imgs)), ' ',
+        Bar(marker='#'), ' ', Percentage(), ' ', Timer()]
+    pbar = ProgressBar(widgets=bar_widgets, maxval=n_imgs)
+
     im_idx = 0
-    for minibatch in iterate_minibatches(inputs,
-                                         targets,
-                                         batchsize,
-                                         shuffle=False):
+    for i, minibatch in enumerate(iterate_minibatches(inputs,
+                                                      targets,
+                                                      batchsize,
+                                                      shuffle=False)):
         mini_x, mini_y, mini_idx = minibatch
         if preprocess_type is None:
             mini_x = img_as_float(mini_x)
@@ -143,17 +147,16 @@ def validate(f_pred,
         # Save samples
         if len(samples_ids) > 0:
             for pred, x, y, f in zip(preds, mini_x, mini_y, mini_f):
-                if (im_idx in samples_ids or (len(samples_ids) == 1 and
-                                              samples_ids == [-1])):
-                    # TODO fix daimler dataset --> Marco fix the dataset!
-                    # f = f.replace(".pgm", ".png")
+                if im_idx in samples_ids:
+                    # Do not use pgm as an extension
+                    f = f.replace(".pgm", ".png")
 
-                    # need  to handle RGB-D or grey_img + disparity
+                    # handle RGB-D or grey_img + disparity
                     if mini_x.shape[-1] in (1, 2):
                         mini_x = gray2rgb(mini_x[:, :, 0])
                     elif mini_x.shape[-1] == 4:
                         mini_x = mini_x[:, :, :-1]
-                    # save Image + GT + prediction
+                    # Save image + GT + prediction
                     im_name = os.path.basename(f)
                     pred_rgb = label2rgb(pred, colors=colormap)
                     y_rgb = label2rgb(y, colors=colormap)
@@ -161,6 +164,10 @@ def validate(f_pred,
                     outpath = os.path.join(seg_path, folder_dataset, im_name)
                     save_image(outpath, concat_img)
                 im_idx += 1
+
+        pbar.update(min(i*batchsize + 1, n_imgs))
+    pbar.update(n_imgs)  # always get to 100%
+    pbar.finish()
 
     # Compute metrics
     if void_is_present:
@@ -184,9 +191,7 @@ def validate(f_pred,
     iou_index = np.nan_to_num(iou_index)
     mean_iou_index = np.mean(iou_index)
 
-    print >>sys.stderr, 'Done'
-
-    return (global_acc, conf_matrix, mean_class_acc, iou_index, mean_iou_index)
+    return global_acc, conf_matrix, mean_class_acc, iou_index, mean_iou_index
 
 
 def zipp(vparams, params):
@@ -307,3 +312,23 @@ def to_int(l):
         The iterable to be converted to float
     """
     return [int(el) for el in l]
+
+
+class VariableText(FormatWidgetMixin, WidthWidgetMixin):
+    mapping = {}
+
+    def __init__(self, format, mapping=mapping, **kwargs):
+        self.format = format
+        self.mapping = mapping
+        FormatWidgetMixin.__init__(self, format=format, **kwargs)
+        WidthWidgetMixin.__init__(self, **kwargs)
+
+    def update_str(self, new_format):
+        self.format = new_format
+
+    def update_mapping(self, new_mapping):
+        self.mapping.update(new_mapping)
+
+    def __call__(self, progress, data):
+        return FormatWidgetMixin.__call__(self, progress, self.mapping,
+                                          self.format)

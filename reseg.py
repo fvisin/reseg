@@ -14,6 +14,7 @@ from lasagne.layers import get_output
 import numpy as np
 # from skimage.data import load
 # from skimage.color import label2rgb
+from progressbar import ProgressBar
 import theano
 from theano import tensor as T
 from theano.compile.nanguardmode import NanGuardMode
@@ -24,7 +25,7 @@ from helper_dataset import preprocess_dataset
 from get_info_model import print_params
 from layers import CropLayer, ReSegLayer
 from subprocess import check_output
-from utils import iterate_minibatches, validate, save_with_retry
+from utils import iterate_minibatches, save_with_retry, validate, VariableText
 
 # Datasets import
 # TODO these should go into preprocess/helper dataset
@@ -818,6 +819,21 @@ def train(saveto='model.npz',
     estop = False
     save = False
 
+    epochs_wid = VariableText(
+        'Epoch %(epoch)d/' + str(max_epochs) + ' Up %(up)d',
+        {'epoch': 0, 'up': 0})
+    metrics_wid = VariableText(
+        'Cost %(cost)f, DD %(DD)f, UD %(UD)f %(shape)s',
+        {'cost': None,
+         'DD': None,
+         'UD': None,
+         'shape': None})
+    widgets = [
+        '', epochs_wid,
+        ' ', metrics_wid]
+    pbar = ProgressBar(widgets=widgets, maxval=len(x_train),
+                       redirect_stdout=True).start()
+
     # Epochs loop
     for eidx in range(max_epochs):
         nsamples = 0
@@ -825,11 +841,11 @@ def train(saveto='model.npz',
         start_time = time.time()
 
         # Minibatches loop
-        for minibatch in iterate_minibatches(x_train,
-                                             y_train,
-                                             batch_size,
-                                             rng=rng,
-                                             shuffle=shuffle):
+        for i, minibatch in enumerate(iterate_minibatches(x_train,
+                                                          y_train,
+                                                          batch_size,
+                                                          rng=rng,
+                                                          shuffle=shuffle)):
             inputs, targets, _ = minibatch
             st = time.time()
             nsamples += len(inputs)
@@ -859,10 +875,17 @@ def train(saveto='model.npz',
             if np.isinf(cost):
                 raise RuntimeError('Inf detected')
 
-            if np.mod(uidx, dispFreq) == 0:
-                print('Epoch {}, Up {}, Cost {:.3f}, DD {:.3f}, UD ' +
-                      '{:.5f} {}').format(eidx, uidx, float(cost), dd, ud,
-                                          input_shape)
+            # if np.mod(uidx, dispFreq) == 0:
+            #     print('Epoch {}, Up {}, Cost {:.3f}, DD {:.3f}, UD ' +
+            #           '{:.5f} {}').format(eidx, uidx, float(cost), dd, ud,
+            #                               input_shape)
+            epochs_wid.update_mapping({'epoch': eidx, 'up': uidx})
+            metrics_wid.update_mapping(
+                {'cost': float(cost),
+                 'DD': dd,
+                 'UD': ud,
+                 'shape': input_shape})
+            pbar.update(min(i*batch_size + 1, len(x_train)))
 
             def validate_model():
                 (train_global_acc,
@@ -1000,10 +1023,10 @@ def train(saveto='model.npz',
         if estop:
             break
 
-        print 'Seen %d samples' % nsamples
         print("Epoch {} of {} took {:.3f}s with overall cost {:.3f}".format(
             eidx + 1, max_epochs, time.time() - start_time, epoch_cost))
 
+    pbar.finish()
     validate_model()
     max_valid_idx = np.argmax(np.array(history_acc)[:, 3])
     best = history_acc[max_valid_idx]
