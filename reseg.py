@@ -4,7 +4,7 @@ import collections
 # import matplotlib.pyplot as plt
 import os
 import random
-from shutil import move
+from shutil import move, rmtree
 import sys
 import time
 
@@ -659,6 +659,15 @@ def train(saveto='model.npz',
     cheight, cwidth, cchannels = x_train[0].shape
     nclasses = max([np.max(el) for el in y_train]) + 1
     print '# of classes:', nclasses
+
+    # Remove the segmentation samples dir to make sure we don't mix samples
+    # from different experiments
+    seg_path = os.path.join('segmentations', dataset,
+                            saveto[0].split('/')[-1][:-4])
+    try:
+        rmtree(seg_path)
+    except OSError:
+        pass
 
     # Class balancing
     # ---------------
