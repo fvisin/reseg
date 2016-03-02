@@ -226,13 +226,12 @@ class ReSegLayer(lasagne.layers.Layer):
                 self.sublayers.append(l_in)
                 self.hypotetical_fm_size = (
                     (self.hypotetical_fm_size - 1) * stride + f_size)
+                # TODO This is right only if stride == filter...
                 expand_height *= f_size[0]
                 expand_width *= f_size[1]
 
                 # Print shape
                 out_shape = get_output_shape(l_in)
-                out_shape = (out_shape[0], out_shape[2],
-                             out_shape[3], out_shape[1])
                 print('RecSeg: After in-convnet: {}'.format(out_shape))
 
         # Pretrained vgg16
@@ -285,7 +284,7 @@ class ReSegLayer(lasagne.layers.Layer):
                 print('ReNet: After 4 rnns {}x{}@{}: {}'.format(
                     pheight[lidx], pwidth[lidx], dim_proj[lidx], out_shape))
 
-            # 1x1 conv layer : dimensional reduction layer
+            # 1x1 conv layer : dimensionality reduction layer
             if conv_dim_red:
                 l_renet = lasagne.layers.Conv2DLayer(
                     l_renet,
@@ -300,8 +299,6 @@ class ReSegLayer(lasagne.layers.Layer):
 
                 # Print shape
                 out_shape = get_output_shape(l_renet)
-                out_shape = (out_shape[0], out_shape[2],
-                             out_shape[3], out_shape[1])
                 print('Dim reduction: After 1x1 convnet: {}'.format(out_shape))
 
         # Upsampling
@@ -383,11 +380,12 @@ class ReSegLayer(lasagne.layers.Layer):
                         mean=lasagne.init.Constant(0),
                         inv_std=lasagne.init.Constant(1))
                     self.sublayers.append(l_upsampling)
+                    print "Batch normalization after Grad layer "
 
                 # Print shape
                 out_shape = get_output_shape(l_upsampling)
-                if batch_norm:
-                    print "Batch normalization after Grad layer "
+                print('Transposed conv: {}x{} (str {}x{}) @ {}:{}'.format(
+                    f_size[0], f_size[1], stride[0], stride[1], nf, out_shape))
 
         elif out_upsampling_type == 'linear':
             # Go to b01c
@@ -406,6 +404,7 @@ class ReSegLayer(lasagne.layers.Layer):
                                                  batch_norm=batch_norm,
                                                  name="linear_upsample_layer")
             self.sublayers.append(l_upsampling)
+            print('Linear upsampling')
 
             if batch_norm:
                 l_upsampling = lasagne.layers.batch_norm(

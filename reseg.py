@@ -1,7 +1,6 @@
 # Standard library imports
 import cPickle as pkl
 import collections
-# import matplotlib.pyplot as plt
 import os
 import random
 from shutil import move, rmtree
@@ -12,8 +11,6 @@ import time
 import lasagne
 from lasagne.layers import get_output
 import numpy as np
-# from skimage.data import load
-# from skimage.color import label2rgb
 from progressbar import ProgressBar
 import theano
 from theano import tensor as T
@@ -21,7 +18,6 @@ from theano.compile.nanguardmode import NanGuardMode
 
 # Local application/library specific imports
 from helper_dataset import preprocess_dataset
-# from config_datasets import colormap_datasets
 from get_info_model import print_params
 from layers import CropLayer, ReSegLayer
 from subprocess import check_output
@@ -107,12 +103,13 @@ def buildReSeg(input_shape, input_var,
                ):
     '''Helper function to build a ReSeg network'''
 
+    # Input is b01c
     print('Input shape: ' + str(input_shape))
     l_in = lasagne.layers.InputLayer(shape=input_shape,
                                      input_var=input_var,
                                      name="input_layer")
 
-    # Convert to batchsize, ch, rows, cols
+    # Convert to bc01 (batchsize, ch, rows, cols)
     l_in = lasagne.layers.DimshuffleLayer(l_in, (0, 3, 1, 2))
 
     # To know the upsampling ratio we compute what is the feature map
@@ -120,9 +117,8 @@ def buildReSeg(input_shape, input_var,
     # initial size of 100 (we just need the ratio, so we don't care
     # about the actual size)
     hypotetical_fm_size = np.array((100.0, 100.0))
-    l_conv = l_in
 
-    l_reseg = ReSegLayer(l_conv, n_layers, pheight, pwidth, dim_proj,
+    l_reseg = ReSegLayer(l_in, n_layers, pheight, pwidth, dim_proj,
                          nclasses, stack_sublayers,
                          # upsampling
                          out_upsampling,
@@ -168,10 +164,9 @@ def buildReSeg(input_shape, input_var,
                          batch_norm=batch_norm,
                          name='reseg')
 
-    # Crop
+    # Dynamic cropping
     target_size = get_output(l_in).shape[2:]
     crop = get_output(l_reseg).shape[2:] - target_size
-    # crop = get_equivalent_input_padding(l_reseg)
     l_out = CropLayer(l_reseg, crop, centered=False)
 
     # channel = nclasses
@@ -239,7 +234,7 @@ def getFunctions(input_var, target_var, class_balance_w_var, l_pred,
     loss *= class_balance_w_var
     loss = loss.reshape((input_var.shape[0], -1))
     # Compute the cumulative loss (over the pixels) per minibatch
-    loss = T.sum(loss, axis=1)
+    loss = T.mean(loss, axis=1)
     # Compute the mean loss
     loss = T.mean(loss, axis=0)
 
@@ -601,19 +596,12 @@ def train(saveto='model.npz',
 
     n_layers = len(dim_proj)
 
-    assert class_balance in [None, 'median_freq_cost',
-                             'natural_freq_cost',
-                             'priors_correction'], ('The balance class '
-                                                    'method is not '
-                                                    'implemented')
-    assert (preprocess_type in
-            [None, 'f-whiten',
-             'conv-zca',
-             'sub-lcn',
-             'subdiv-lcn',
-             'gcn',
-             'local_mean_sub']), ("The preprocessing method choosen is not "
-                                  "implemented")
+    assert class_balance in [None, 'median_freq_cost', 'natural_freq_cost',
+                             'priors_correction'], (
+        'The balance class method is not implemented')
+    assert (preprocess_type in [None, 'f-whiten', 'conv-zca', 'sub-lcn',
+                                'subdiv-lcn', 'gcn', 'local_mean_sub']), (
+            "The preprocessing method choosen is not implemented")
 
     # Load data
     # ---------
