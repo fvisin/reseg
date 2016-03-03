@@ -2,7 +2,7 @@ from collections import Iterable
 
 import numpy as np
 import lasagne
-from lasagne.layers import get_output, get_output_shape
+from lasagne.layers import get_all_layers, get_output, get_output_shape
 from lasagne.layers.conv import TransposeConv2DLayer as DeconvLayer
 from theano.sandbox.cuda.basic_ops import gpu_contiguous
 import theano.tensor as T
@@ -210,11 +210,12 @@ class ReSegLayer(lasagne.layers.Layer):
         # Input ConvLayers
         if isinstance(in_nfilters, Iterable) and not isinstance(in_nfilters,
                                                                 str):
+            l_conv = l_in
             for i, (nf, f_size, stride) in enumerate(
                     zip(in_nfilters, in_filters_size, in_filters_stride)):
 
-                l_in = ConvLayer(
-                    l_in,
+                l_conv = ConvLayer(
+                    l_conv,
                     num_filters=nf,
                     filter_size=f_size,
                     stride=stride,
@@ -223,7 +224,7 @@ class ReSegLayer(lasagne.layers.Layer):
                     pad='valid',
                     name=self.name + '_input_conv_layer' + str(i)
                 )
-                self.sublayers.append(l_in)
+                self.sublayers.append(l_conv)
                 self.hypotetical_fm_size = (
                     (self.hypotetical_fm_size - 1) * stride + f_size)
                 # TODO This is right only if stride == filter...
@@ -231,19 +232,23 @@ class ReSegLayer(lasagne.layers.Layer):
                 expand_width *= f_size[1]
 
                 # Print shape
-                out_shape = get_output_shape(l_in)
+                out_shape = get_output_shape(l_conv)
                 print('RecSeg: After in-convnet: {}'.format(out_shape))
 
         # Pretrained vgg16
         elif in_nfilters == 'vgg':
             from vgg16 import buildVgg16
-            l_vgg16 = buildVgg16(l_in, 'conv3_3', False)
+            l_conv = buildVgg16(l_in, 'conv3_3', False)
             hypotetical_fm_size /= 4
             expand_height = expand_width = 4
-            l_in = l_vgg16
+            # Get vgg sublayers (without previous layers)
+            vgg_sublayers = get_all_layers(l_conv)
+            bgr = next(l for l in vgg_sublayers if l.name == 'vgg16_bgr')
+            vgg_sublayers = vgg_sublayers[vgg_sublayers.index(bgr):]
+            self.sublayers.extend(vgg_sublayers)
 
         # ReNet layers
-        l_renet = l_in
+        l_renet = l_conv
         for lidx in xrange(n_layers):
             l_renet = ReNetLayer(l_renet,
                                  patch_size=(pwidth[lidx], pheight[lidx]),
@@ -363,6 +368,7 @@ class ReSegLayer(lasagne.layers.Layer):
                     num_filters=nf,
                     filter_size=f_size,
                     stride=stride,
+                    pad=0,
                     W=out_W_init,
                     b=out_b_init,
                     nonlinearity=out_nonlinearity)
@@ -445,6 +451,7 @@ class ReSegLayer(lasagne.layers.Layer):
             input_shape = output_shape
 
         return output_shape
+        # return self.l_out.get_output_shape_for(input_shape)
         # return list(input_shape[0:3]) + [self.nclasses]
 
     def get_output_for(self, input_var, **kwargs):
