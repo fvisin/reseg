@@ -134,8 +134,9 @@ def validate(f_pred,
                                                       batchsize,
                                                       shuffle=False)):
         mini_x, mini_y, mini_idx = minibatch
-        if preprocess_type is None:
-            mini_x = img_as_float(mini_x)
+        # VGG needs 0:255 int inputs
+        #if preprocess_type is None:
+        #    mini_x = img_as_float(mini_x)
         mini_f = filenames[mini_idx]
         preds = f_pred(mini_x.astype(floatX))
 

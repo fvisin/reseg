@@ -850,8 +850,8 @@ def train(saveto='model.npz',
             uidx += 1
 
             # otherwise the normalization has been done before the preprocess
-            if preprocess_type is None:
-                inputs = inputs.astype(floatX)
+            # if preprocess_type is None:
+            #     inputs = inputs.astype(floatX)
 
             targets = targets.astype(intX)
             targets_flat = targets.flatten()
