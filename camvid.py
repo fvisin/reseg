@@ -1,22 +1,16 @@
 from __future__ import division
 import os
 from collections import OrderedDict
-import ctypes
 import numpy as np
 
-import scipy.io as sio
-from skimage import exposure
-from skimage import io
-from skimage import img_as_float, img_as_ubyte, img_as_uint, img_as_int
-from skimage.color import label2rgb, rgb2hsv, hsv2rgb
-from skimage.io import ImageCollection, imsave
+from skimage import img_as_ubyte
+from skimage.color import label2rgb, rgb2hsv
+from skimage.io import ImageCollection
 from skimage.transform import resize
 from itertools import izip
 
 from config_datasets import (colormap_datasets as colors_list)
-from helper_dataset import zero_pad, \
-    compare_mask_image_filenames, convert_RGB_mask_to_index, \
-    rgb2illumination_invariant, save_image
+from helper_dataset import convert_RGB_mask_to_index, save_image
 
 N_DEBUG = -5
 DEBUG_SAVE_IMG = False
@@ -29,6 +23,7 @@ def properties():
     return {  # 'reshape': [212, 264, 3],
         # 'reorder': [0, 1, 2],
         # 'rereorder': [0, 1, 2]
+        'void_is_present': True
     }
 
 
@@ -334,22 +329,21 @@ def load_data(
          filenames_test,
          img_val,
          mask_val,
-         filenames_val) = load_dataset_camvid(path,
-                                              resize_images=resize_images,
-                                              resize_size=resize_size,
-                                              load_greylevel_mask=
-                                              load_greylevel_mask,
-                                              classes=classes,
-                                              save=save,
-                                              color_space=color_space
-                                              )
+         filenames_val) = load_dataset_camvid(
+             path,
+             resize_images=resize_images,
+             resize_size=resize_size,
+             load_greylevel_mask=load_greylevel_mask,
+             classes=classes,
+             save=save,
+             color_space=color_space)
 
     if compute_stats == 'all':
         images = np.asarray(img_train + img_val + img_test)
     elif compute_stats == 'train':
         images = np.asarray(img_train)
 
-    # all images have the same dimension --> we can compute per pixel statistics
+    # all images have the same dimension --> we can compute perpixel statistics
     mean = images.mean(axis=0)[np.newaxis, ...]
     std = np.maximum(images.std(axis=0), 1e-8)[np.newaxis, ...]
     print "Computing dataset statistics ..."

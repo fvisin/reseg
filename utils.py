@@ -54,13 +54,13 @@ def save_image(outpath, img):
 def validate(f_pred,
              data,
              batchsize,
+             void_is_present,
              preprocess_type=None,
              nclasses=2,
              samples_ids=[],
              dataset='camvid',
              saveto='test_lasagne',
              mean=None, std=None, fullmasks=None,
-             void_is_present=False,
              filenames=None, folder_dataset='pred'):
     """validate
 
@@ -72,6 +72,9 @@ def validate(f_pred,
         The
     batchsize :
         The
+    void_is_present :
+        In some dataset there are some unlabeled pixels that we don't consider
+        in the evalution metrics
     nclasses :
         The
     samples_ids :
@@ -86,9 +89,6 @@ def validate(f_pred,
         The
     fullmasks :
         The
-    void_is_present :
-        In some dataset there are some unlabeled pixels that we don't consider
-        in the evalution metrics
     filenames :
         The
     folder_dataset :
