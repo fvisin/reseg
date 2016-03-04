@@ -224,11 +224,11 @@ def getFunctions(input_var, target_var, class_balance_w_var, l_pred,
                                            **batch_norm_params)
     f_pred = theano.function(
         [input_var],
-        T.argmax(prediction, axis=1).reshape(input_var.shape[:3]))
+        T.argmax(prediction, axis=1).reshape(
+            (-1, input_shape[1], input_shape[2])))
 
     # Compute the loss to be minimized during training
     prediction = lasagne.layers.get_output(l_pred)
-
     batch_norm_params = dict()
     if batch_norm:
         batch_norm_params.update(
@@ -242,7 +242,7 @@ def getFunctions(input_var, target_var, class_balance_w_var, l_pred,
         prediction, target_var)
 
     loss *= class_balance_w_var
-    loss = loss.reshape((input_var.shape[0], -1))
+    loss = loss.reshape((-1, input_shape[1] * input_shape[2]))
     # Compute the cumulative loss (over the pixels) per minibatch
     loss = T.mean(loss, axis=1)
     # Compute the mean loss
