@@ -128,7 +128,6 @@ def validate(f_pred,
         Bar(marker='#'), ' ', Percentage(), ' ', Timer()]
     pbar = ProgressBar(widgets=bar_widgets, maxval=n_imgs)
 
-    im_idx = 0
     for i, minibatch in enumerate(iterate_minibatches(inputs,
                                                       targets,
                                                       batchsize,
@@ -140,6 +139,9 @@ def validate(f_pred,
         mini_f = filenames[mini_idx]
         preds = f_pred(mini_x.astype(floatX))
 
+        # just for visualization
+        mini_x = (mini_x / 255.).astype(floatX)
+
         # Compute the confusion matrix for each image
         cf_m = confusion_matrix(mini_y.flatten(), preds.flatten(),
                                 range(0, nclasses))
@@ -148,24 +150,23 @@ def validate(f_pred,
         # Save samples
         if len(samples_ids) > 0:
             for pred, x, y, f in zip(preds, mini_x, mini_y, mini_f):
-                if im_idx in samples_ids:
+                if i in samples_ids:
                     # Do not use pgm as an extension
                     f = f.replace(".pgm", ".png")
 
-                    # handle RGB-D or grey_img + disparity
-                    if mini_x.shape[-1] in (1, 2):
-                        mini_x = gray2rgb(mini_x[:, :, 0])
-                    elif mini_x.shape[-1] == 4:
-                        mini_x = mini_x[:, :, :-1]
-                    # Save image + GT + prediction
+                    # Handle RGB-D or grey_img + disparity
+                    if x.shape[-1] in (1, 2):
+                        x = gray2rgb(x[:, :, 0])
+                    elif x.shape[-1] == 4:
+                        x = x[:, :, :-1]
+
+                    # Save Image + GT + prediction
                     im_name = os.path.basename(f)
                     pred_rgb = label2rgb(pred, colors=colormap)
                     y_rgb = label2rgb(y, colors=colormap)
-                    concat_img = np.concatenate((x, y_rgb, pred_rgb), axis=1)
+                    im_save = np.concatenate((x, y_rgb, pred_rgb), axis=1)
                     outpath = os.path.join(seg_path, folder_dataset, im_name)
-                    save_image(outpath, concat_img)
-                im_idx += 1
-
+                    save_image(outpath, im_save)
         pbar.update(min(i*batchsize + 1, n_imgs))
     pbar.update(n_imgs)  # always get to 100%
     pbar.finish()
