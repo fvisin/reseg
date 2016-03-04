@@ -734,6 +734,8 @@ def train(saveto='model.npz',
 
         input_var.tag.test_value = x_tag
         target_var.tag.test_value = y_tag.flatten()
+        class_balance_w_var.tag.test_value = np.ones(
+            np.prod(x_tag.shape[:3])).astype(floatX)
         theano.config.compute_test_value = 'warn'
 
     # Build the model
