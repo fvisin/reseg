@@ -208,10 +208,20 @@ def getFunctions(input_var, target_var, class_balance_w_var, l_pred,
     '''Helper function to build the training function
 
     '''
+    input_shape = input_var.shape
+    # Compute BN params for prediction
+    batch_norm_params = dict()
+    if batch_norm:
+        batch_norm_params.update(
+            dict(batch_norm_update_averages=False))
+        batch_norm_params.update(
+            dict(batch_norm_use_averages=True))
+
     # Prediction function:
     # computes the deterministic distribution over the labels, i.e. we
     # disable the stochastic layers such as Dropout
-    prediction = lasagne.layers.get_output(l_pred, deterministic=True)
+    prediction = lasagne.layers.get_output(l_pred, deterministic=True,
+                                           **batch_norm_params)
     f_pred = theano.function(
         [input_var],
         T.argmax(prediction, axis=1).reshape(input_var.shape[:3]))
