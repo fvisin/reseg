@@ -228,7 +228,6 @@ def getFunctions(input_var, target_var, class_balance_w_var, l_pred,
             (-1, input_shape[1], input_shape[2])))
 
     # Compute the loss to be minimized during training
-    prediction = lasagne.layers.get_output(l_pred)
     batch_norm_params = dict()
     if batch_norm:
         batch_norm_params.update(
@@ -244,7 +243,7 @@ def getFunctions(input_var, target_var, class_balance_w_var, l_pred,
     loss *= class_balance_w_var
     loss = loss.reshape((-1, input_shape[1] * input_shape[2]))
     # Compute the cumulative loss (over the pixels) per minibatch
-    loss = T.mean(loss, axis=1)
+    loss = T.sum(loss, axis=1)
     # Compute the mean loss
     loss = T.mean(loss, axis=0)
 
@@ -696,7 +695,6 @@ def train(saveto='model.npz',
 
         assert len(priors) == nclasses, ("Number of computed priors are "
                                          "different from number of classes")
-        w_freq_shared = theano.shared(w_freq)
 
     if validFreq == -1:
         validFreq = len(x_train)/batch_size
