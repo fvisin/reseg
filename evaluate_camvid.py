@@ -1,10 +1,8 @@
 from reseg import train
 import lasagne
 
+
 def main(job_id, params):
-    print('Anything printed here will end up in the output directory for job'
-          '#%d' % job_id)
-    print params
     train_acc, valid_acc, test_acc, test_mean_class_acc, test_mean_iou = train(
 
         saveto=params['saveto'],
@@ -116,10 +114,12 @@ def main(job_id, params):
     )
     return train_acc, valid_acc, test_acc, test_mean_class_acc, test_mean_iou
 
-if __name__ == '__main__': 
+
+if __name__ == '__main__':
+    dataset = 'camvid'
     main(1, {
-        'saveto':  'camvid_models/model_recseg' + __file__[8:-3] + '.npz',
-        'tmp-saveto':  'tmp/model_recseg' + __file__[8:-3] + '.npz',
+        'saveto':  dataset + '_models/model_recseg_' + dataset + '.npz',
+        'tmp-saveto':  'tmp/model_recseg_' + dataset + '.npz',
 
         # Note: with linear_conv you cannot select every filter size.
         # It is not trivial to invert with expand unless they are a
@@ -223,7 +223,7 @@ if __name__ == '__main__':
         'shuffle': True,
 
         # Dataset
-        'dataset': 'camvid',
+        'dataset': dataset,
         'color-space': 'RGB',
         'color': True,
         'resize-images': True,

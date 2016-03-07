@@ -109,14 +109,13 @@ def validate(f_pred,
     if len(data) == 0 or len(samples_ids) == 0:
         return 0., [], [], 0., [], 0.
 
-    name = dataset
-    seg_path = os.path.join('segmentations', name,
+    seg_path = os.path.join('segmentations', dataset,
                             saveto.split('/')[-1][:-4])
 
     # hack for nyu because now I don't have the time to better think
-    if name == 'nyu_depth':
-        name = 'nyu_depth40' if nclasses == 41 else 'nyu_depth04'
-    colormap = colormap_datasets[name]
+    if dataset == 'nyu_depth':
+        dataset = 'nyu_depth40' if nclasses == 41 else 'nyu_depth04'
+    colormap = colormap_datasets[dataset]
 
     inputs, targets = data
     conf_matrix = np.zeros([nclasses, nclasses]).astype('float32')
