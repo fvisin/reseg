@@ -208,9 +208,9 @@ class ReSegLayer(lasagne.layers.Layer):
         expand_height = expand_width = 1
 
         # Input ConvLayers
+        l_conv = l_in
         if isinstance(in_nfilters, Iterable) and not isinstance(in_nfilters,
                                                                 str):
-            l_conv = l_in
             for i, (nf, f_size, stride) in enumerate(
                     zip(in_nfilters, in_filters_size, in_filters_stride)):
 
