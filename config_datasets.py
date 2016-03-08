@@ -1,9 +1,11 @@
+from collections import OrderedDict
+from itertools import izip
 import os
-import numpy as np
+
 import matplotlib as mpl
 import matplotlib.pyplot as plt
-from collections import OrderedDict
 import matplotlib.cm as cm
+import numpy as np
 import scipy.io as sio
 
 
@@ -37,9 +39,11 @@ cmaps = [('Perceptually Uniform Sequential',
 # we should join more colormaps!
 nclasses = 1000
 color_bins = np.linspace(0, 1, nclasses)
-norm = mpl.colors.Normalize(vmin=0, vmax=1)
-m = cm.ScalarMappable(norm=norm, cmap=plt.get_cmap('Pastel2'))
-colormap_coco = m.to_rgba(color_bins)[:, :3]
+norm_bins = mpl.colors.Normalize(vmin=0, vmax=1)
+m = cm.ScalarMappable(norm=norm_bins, cmap=plt.get_cmap('Pastel2'))
+colormap = m.to_rgba(color_bins)[:, :3]
+colormap_mscoco = dict(izip(iter(range(nclasses)), colormap))
+headers_mscoco = [str(i) for i in range(nclasses)]
 
 
 # ##### DAIMLER ##### #
@@ -243,8 +247,9 @@ colormap_datasets["camvid"] = colormap_camvid
 colormap_datasets["daimler"] = colormap_daimler
 colormap_datasets["fashionista"] = colormap_fashionista
 colormap_datasets["flowers"] = colormap_flowers
-colormap_datasets["kitti_road"] = colormap_kitti_road
 colormap_datasets["horses"] = colormap_horses
+colormap_datasets["kitti_road"] = colormap_kitti_road
+colormap_datasets["mscoco"] = colormap_mscoco
 
 for key, value in colormap_datasets.iteritems():
     colormap_datasets[key] = np.asarray(
@@ -259,6 +264,7 @@ headers_datasets["camvid"] = headers_camvid
 headers_datasets["daimler"] = headers_daimler
 headers_datasets["kitti_road"] = headers_kitti_road
 headers_datasets["horses"] = headers_horses
+headers_datasets["mscoco"] = headers_mscoco
 headers_datasets["nyu_depth04"] = headers_nyu_depth04
 headers_datasets["nyu_depth40"] = headers_nyu_depth40
 headers_datasets["sunrgbd"] = headers_sunrgbd
