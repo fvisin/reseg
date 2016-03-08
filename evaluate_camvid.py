@@ -80,8 +80,7 @@ def main(job_id, params):
         max_epochs=params['max-epochs'],
         min_epochs=params['min-epochs'],
 
-        # Save, display params
-        dispFreq=params['dispFreq'],
+        # Sampling and validation params
         validFreq=params['validFreq'],
         saveFreq=params['saveFreq'],
         n_save=params['n-save'],
@@ -209,8 +208,7 @@ if __name__ == '__main__':
         'max-epochs': 5000,
         'min-epochs': 100,
 
-        # Save, display params
-        'dispFreq': -1,
+        # Sampling and validation params
         'validFreq': -1,
         'saveFreq': -1,  # Parameters pickle frequency
         'n-save': -1,  # If n-save is a list of indexes, the corresponding

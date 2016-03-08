@@ -405,8 +405,7 @@ def train(saveto='model.npz',
           max_epochs=5000,
           min_epochs=100,
 
-          # Save, display params
-          dispFreq=100,
+          # Sampling and validation params
           validFreq=1000,
           saveFreq=1000,  # Parameters pickle frequency
           n_save=-1,  # If n_save is a list of indexes, the corresponding
