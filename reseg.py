@@ -174,15 +174,16 @@ def buildReSeg(input_shape, input_var,
     l_out = CropLayer(l_reseg, crop, centered=False)
 
     # channel = nclasses
-    l_out = lasagne.layers.Conv2DLayer(
-        l_out,
-        num_filters=nclasses,
-        filter_size=(1, 1),
-        stride=(1, 1),
-        W=out_W_init,
-        b=out_b_init,
-        nonlinearity=None
-    )
+    if out_upsampling is not 'linear':
+        l_out = lasagne.layers.Conv2DLayer(
+            l_out,
+            num_filters=nclasses,
+            filter_size=(1, 1),
+            stride=(1, 1),
+            W=out_W_init,
+            b=out_b_init,
+            nonlinearity=None
+        )
     # Go to b01c
     l_out = lasagne.layers.DimshuffleLayer(
         l_out,
