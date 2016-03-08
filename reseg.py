@@ -28,11 +28,11 @@ from utils import iterate_minibatches, save_with_retry, validate, VariableText
 import camvid
 import daimler
 import fashionista
+import flowers
 import horses
 import kitti_road
 import mscoco
 import nyu_depth
-import oxford_flowers
 import sunrgbd
 
 floatX = theano.config.floatX
@@ -44,7 +44,7 @@ nanguard = False
 datasets = {'camvid': (camvid.load_data, camvid.properties),
             'daimler': (daimler.load_data, daimler.properties),
             'fashionista': (fashionista.load_data, fashionista.properties),
-            'flowers': (oxford_flowers.load_data, oxford_flowers.properties),
+            'flowers': (flowers.load_data, flowers.properties),
             'horses': (horses.load_data, horses.properties),
             'kitti_road': (kitti_road.load_data, kitti_road.properties),
             'mscoco': (mscoco.load_data, mscoco.properties),
@@ -629,7 +629,7 @@ def train(saveto='model.npz',
         use_depth=use_depth,
         with_filenames=True,
         with_fullmasks=True)
-    void_is_present = properties()['void_is_present']
+    has_void_class = properties()['has_void_class']
 
     if not color:
         if mean.ndim == 3:
@@ -898,7 +898,7 @@ def train(saveto='model.npz',
                  train_mean_iou_index) = validate(f_pred,
                                                   train,
                                                   valid_batch_size,
-                                                  void_is_present,
+                                                  has_void_class,
                                                   preprocess_type,
                                                   nclasses,
                                                   samples_ids=samples_ids[0],
@@ -913,7 +913,7 @@ def train(saveto='model.npz',
                  valid_mean_iou_index) = validate(f_pred,
                                                   valid,
                                                   valid_batch_size,
-                                                  void_is_present,
+                                                  has_void_class,
                                                   preprocess_type,
                                                   nclasses,
                                                   samples_ids=samples_ids[1],
@@ -928,7 +928,7 @@ def train(saveto='model.npz',
                  test_mean_iou_index) = validate(f_pred,
                                                  test,
                                                  valid_batch_size,
-                                                 void_is_present,
+                                                 has_void_class,
                                                  preprocess_type,
                                                  nclasses,
                                                  samples_ids=samples_ids[2],

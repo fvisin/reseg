@@ -54,7 +54,7 @@ def save_image(outpath, img):
 def validate(f_pred,
              data,
              batchsize,
-             void_is_present,
+             has_void,
              preprocess_type=None,
              nclasses=2,
              samples_ids=[],
@@ -72,9 +72,9 @@ def validate(f_pred,
         The
     batchsize :
         The
-    void_is_present :
+    has_void:
         In some dataset there are some unlabeled pixels that we don't consider
-        in the evalution metrics
+        in the metrics evaluation
     nclasses :
         The
     samples_ids :
@@ -170,27 +170,28 @@ def validate(f_pred,
     pbar.update(n_imgs)  # always get to 100%
     pbar.finish()
 
-    # Compute metrics
-    if void_is_present:
-        conf_matrix = conf_matrix[:-1, :-1]
-
     # Compute per class metrics
-    per_class_TP = np.diagonal(conf_matrix)
+    per_class_TP = np.diagonal(conf_matrix).astype(floatX)
     per_class_FP = conf_matrix.sum(axis=0) - per_class_TP
     per_class_FN = conf_matrix.sum(axis=1) - per_class_TP
 
+    # Compute global accuracy
     n_pixels = np.sum(conf_matrix)
+    if has_void:
+        n_pixels -= np.sum(conf_matrix[-1, :])
     global_acc = per_class_TP.sum() / float(n_pixels)
 
     # Class Accuracy
     class_acc = per_class_TP / (per_class_FN + per_class_TP)
     class_acc = np.nan_to_num(class_acc)
-    mean_class_acc = np.mean(class_acc)
+    mean_class_acc = (np.mean(class_acc[:-1]) if has_void else
+                      np.mean(class_acc))
 
     # Class Intersection over Union
     iou_index = per_class_TP / (per_class_TP + per_class_FP + per_class_FN)
     iou_index = np.nan_to_num(iou_index)
-    mean_iou_index = np.mean(iou_index)
+    mean_iou_index = (np.mean(iou_index[:-1]) if has_void else
+                      np.mean(iou_index))
 
     return global_acc, conf_matrix, mean_class_acc, iou_index, mean_iou_index
 

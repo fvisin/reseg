@@ -23,7 +23,7 @@ def properties():
     return {  # 'reshape': [212, 264, 3],
         # 'reorder': [0, 1, 2],
         # 'rereorder': [0, 1, 2]
-        'void_is_present': True
+        'has_void_class': True
     }
 
 
