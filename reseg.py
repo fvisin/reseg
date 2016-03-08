@@ -804,11 +804,11 @@ def train(saveto='model.npz',
             try:
                 with np.load('%s' % s) as f:
                     vparams = [f['arr_%d' % i] for i in range(len(f.files))]
-                    bestparams, bestparams_val = vparams
+                    lastparams, bestparams = vparams
                     # for i, v in enumerate(options['trng']):
                     #     trng.state_updates[i][0].set_value(v)
                     print('Model file loaded: {}'.format(s))
-                lasagne.layers.set_all_param_values(l_out, bestparams_val)
+                lasagne.layers.set_all_param_values(l_out, bestparams)
 
                 break
             except IOError:
