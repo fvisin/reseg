@@ -161,6 +161,9 @@ def validate(f_pred,
         if len(samples_ids) > 0:
             for pred, x, y, f in zip(preds, mini_x, mini_y, mini_f):
                 if i in samples_ids:
+                    # Fix hdf5 stores string into an ndarray
+                    if isinstance(f, np.ndarray) and len(f) == 1:
+                        f = f[0]
                     # Do not use pgm as an extension
                     f = f.replace(".pgm", ".png")
 
