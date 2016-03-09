@@ -179,7 +179,9 @@ def validate(f_pred,
     n_pixels = np.sum(conf_matrix)
     if has_void:
         n_pixels -= np.sum(conf_matrix[-1, :])
-    global_acc = per_class_TP.sum() / float(n_pixels)
+        global_acc = per_class_TP[:-1].sum() / float(n_pixels)
+    else:
+        global_acc = per_class_TP.sum() / float(n_pixels)
 
     # Class Accuracy
     class_acc = per_class_TP / (per_class_FN + per_class_TP)
