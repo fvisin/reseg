@@ -941,14 +941,15 @@ def train(saveto='model.npz',
                 print('Train {:.5f} Valid {:.5f} Test {:.5f}'.format(
                     train_global_acc, valid_global_acc, test_global_acc))
 
-                print("Mean Class Accuracy:")
-                print('Train {:.5f} Valid {:.5f} Test {:.5f}'.format(
-                    train_mean_class_acc, valid_mean_class_acc,
-                    test_mean_class_acc))
+                print('Mean Class Accuracy - Train {:.5f} Valid {:.5f} '
+                      'Test {:.5f}'.format(train_mean_class_acc,
+                                           valid_mean_class_acc,
+                                           test_mean_class_acc))
 
-                print('Train {:.5f} Valid {:.5f} Test {:.5f}'.format(
-                    train_mean_iou_index, valid_mean_iou_index,
-                    test_mean_iou_index))
+                print('Mean Class iou - Train {:.5f} Valid {:.5f} '
+                      'Test {:.5f}'.format(train_mean_iou_index,
+                                           valid_mean_iou_index,
+                                           test_mean_iou_index))
                 print("")
 
                 history_acc.append([train_global_acc,
