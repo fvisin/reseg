@@ -1,13 +1,14 @@
+import collections
 import cPickle as pkl
-import matplotlib.pyplot as plt
-import numpy
 import os
 import sys
-import collections
+
+import matplotlib.pyplot as plt
+import numpy
 from tabulate import tabulate
-import lasagne
 
 from config_datasets import headers_datasets
+
 
 def get_all(in_filename='model_recseg_camvid.npz.pkl', plot=True,
             multiple=False):

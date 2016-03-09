@@ -1,6 +1,9 @@
 from collections import OrderedDict
+from itertools import izip
 import os
 
+import matplotlib
+from matplotlib import cm, pyplot
 import numpy as np
 from progressbar import Bar, FormatLabel, Percentage, ProgressBar, Timer
 from progressbar.widgets import FormatWidgetMixin, WidthWidgetMixin
@@ -115,7 +118,14 @@ def validate(f_pred,
     # hack for nyu because now I don't have the time to better think
     if dataset == 'nyu_depth':
         dataset = 'nyu_depth40' if nclasses == 41 else 'nyu_depth04'
-    colormap = colormap_datasets[dataset]
+    try:
+        colormap = colormap_datasets[dataset]
+    except KeyError:
+        color_bins = np.linspace(0, 1, nclasses)
+        norm_bins = matplotlib.colors.Normalize(vmin=0, vmax=1)
+        m = cm.ScalarMappable(norm=norm_bins, cmap=pyplot.get_cmap('Pastel2'))
+        colormap = m.to_rgba(color_bins)[:, :3]
+        colormap = dict(izip(iter(range(nclasses)), colormap))
 
     inputs, targets = data
     conf_matrix = np.zeros([nclasses, nclasses]).astype('float32')
@@ -131,11 +141,12 @@ def validate(f_pred,
                                                       targets,
                                                       batchsize,
                                                       shuffle=False)):
-        mini_x, mini_y, mini_idx = minibatch
+        mini_x, mini_y, mini_slice = minibatch
         # VGG needs 0:255 int inputs
         #if preprocess_type is None:
         #    mini_x = img_as_float(mini_x)
-        mini_f = filenames[mini_idx]
+        mini_f = filenames[mini_slice]
+
         preds = f_pred(mini_x.astype(floatX))
 
         # just for visualization

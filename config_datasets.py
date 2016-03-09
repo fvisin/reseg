@@ -31,21 +31,6 @@ cmaps = [('Perceptually Uniform Sequential',
                              'gist_rainbow', 'hsv', 'flag', 'prism'])]
 
 
-# ##### MSCOCO ##### #
-# How to: choose a colormap, generate a linspace from 0 to 1
-# with nclasses bins as follows
-# ATTENTION: 1000 classes are too many for one single colormap..
-# some colors are the same, because the transition is too smooth.
-# we should join more colormaps!
-nclasses = 1000
-color_bins = np.linspace(0, 1, nclasses)
-norm_bins = mpl.colors.Normalize(vmin=0, vmax=1)
-m = cm.ScalarMappable(norm=norm_bins, cmap=plt.get_cmap('Pastel2'))
-colormap = m.to_rgba(color_bins)[:, :3]
-colormap_mscoco = dict(izip(iter(range(nclasses)), colormap))
-headers_mscoco = [str(i) for i in range(nclasses)]
-
-
 # ##### DAIMLER ##### #
 colormap_daimler = OrderedDict([
     (0, np.array([128, 64, 128], dtype=np.uint8)),  # ground
@@ -249,7 +234,6 @@ colormap_datasets["fashionista"] = colormap_fashionista
 colormap_datasets["flowers"] = colormap_flowers
 colormap_datasets["horses"] = colormap_horses
 colormap_datasets["kitti_road"] = colormap_kitti_road
-colormap_datasets["mscoco"] = colormap_mscoco
 
 for key, value in colormap_datasets.iteritems():
     colormap_datasets[key] = np.asarray(
@@ -264,7 +248,6 @@ headers_datasets["camvid"] = headers_camvid
 headers_datasets["daimler"] = headers_daimler
 headers_datasets["kitti_road"] = headers_kitti_road
 headers_datasets["horses"] = headers_horses
-headers_datasets["mscoco"] = headers_mscoco
 headers_datasets["nyu_depth04"] = headers_nyu_depth04
 headers_datasets["nyu_depth40"] = headers_nyu_depth40
 headers_datasets["sunrgbd"] = headers_sunrgbd
