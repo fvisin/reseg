@@ -117,8 +117,8 @@ def main(job_id, params):
 if __name__ == '__main__':
     dataset = 'camvid'
     main(1, {
-        'saveto':  dataset + '_models/model_recseg_' + dataset + '.npz',
-        'tmp-saveto':  'tmp/model_recseg_' + dataset + '.npz',
+        'saveto':  dataset + '_models/model_recseg_' + __file__[8:-3] + '.npz',
+        'tmp-saveto':  'tmp/model_recseg_' + __file__[8:-3] + '.npz',
 
         # Note: with linear_conv you cannot select every filter size.
         # It is not trivial to invert with expand unless they are a
