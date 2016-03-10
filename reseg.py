@@ -478,6 +478,8 @@ def train(saveto='model.npz',
     options['history_acc'] = np.array([])
     options['history_conf_matrix'] = np.array([])
     options['history_iou_index'] = np.array([])
+    options['eidx'] = 0
+    options['uidx'] = 0
 
     # Reload
     # ------
@@ -817,7 +819,7 @@ def train(saveto='model.npz',
     # Main loop
     # ---------
     print("Starting training...")
-    uidx = 0
+    uidx = options['uidx']
     patience_counter = 0
     estop = False
     save = False
@@ -838,7 +840,7 @@ def train(saveto='model.npz',
                        redirect_stdout=True).start()
 
     # Epochs loop
-    for eidx in range(max_epochs):
+    for eidx in range(options['uidx'], max_epochs):
         nsamples = 0
         epoch_cost = 0
         start_time = time.time()
