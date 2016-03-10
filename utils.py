@@ -1,5 +1,4 @@
 from collections import OrderedDict
-from itertools import izip
 import os
 
 import matplotlib
@@ -125,7 +124,6 @@ def validate(f_pred,
         norm_bins = matplotlib.colors.Normalize(vmin=0, vmax=1)
         m = cm.ScalarMappable(norm=norm_bins, cmap=pyplot.get_cmap('Pastel2'))
         colormap = m.to_rgba(color_bins)[:, :3]
-        colormap = dict(izip(iter(range(nclasses)), colormap))
 
     inputs, targets = data
     conf_matrix = np.zeros([nclasses, nclasses]).astype('float32')
