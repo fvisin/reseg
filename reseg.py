@@ -641,7 +641,12 @@ def train(saveto='model.npz',
 
     # Preprocess each image separately usually with LCN in order not to lose
     # time at each epoch
+
+    # Default: input is float btw 0 and 1
+    # If we use vgg convnet the input should be 0:255
+    input_to_float = False if in_nfilters == 'vgg' else True
     train, valid, test = preprocess_dataset(train, valid, test,
+                                            input_to_float,
                                             preprocess_type,
                                             patch_size, max_patches)
 

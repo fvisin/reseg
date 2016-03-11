@@ -166,8 +166,17 @@ def save_RGB_mask(outpath, mask):
 
 
 def preprocess_dataset(train, valid, test,
+                       input_to_float,
                        preprocess_type,
                        patch_size, max_patches):
+
+    if input_to_float:
+        train_norm = train[0] / 255.
+        train = (train_norm, train[1])
+        valid_norm = valid[0] / 255.
+        valid = (valid_norm, valid[1])
+        test_norm = test[0] / 255.
+        test = (test_norm, test[1])
 
     if preprocess_type is None:
         return train, valid, test
@@ -176,7 +185,7 @@ def preprocess_dataset(train, valid, test,
     print("Preprocessing train set with ", preprocess_type, " ", patch_size)
     train_pre = []
     for x in train[0]:
-        img = (np.expand_dims(x, axis=0) / 255.).astype(floatX)
+        img = np.expand_dims(x, axis=0)
         x_pre = preprocess(img, preprocess_type,
                            patch_size,
                            max_patches)
@@ -186,7 +195,7 @@ def preprocess_dataset(train, valid, test,
     print("Preprocessing valid set with ", preprocess_type, " ", patch_size)
     valid_pre = []
     for x in valid[0]:
-        img = (np.expand_dims(x, axis=0) / 255.).astype(floatX)
+        img = np.expand_dims(x, axis=0)
         x_pre = preprocess(img, preprocess_type,
                            patch_size,
                            max_patches)
@@ -196,7 +205,7 @@ def preprocess_dataset(train, valid, test,
     print("Preprocessing test set with ", preprocess_type, " ", patch_size)
     test_pre = []
     for x in test[0]:
-        img = (np.expand_dims(x, axis=0) / 255.).astype(floatX)
+        img = np.expand_dims(x, axis=0)
         x_pre = preprocess(img, preprocess_type,
                            patch_size,
                            max_patches)
