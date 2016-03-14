@@ -1,7 +1,7 @@
+import argparse
 import collections
 import cPickle as pkl
 import os
-import sys
 
 import matplotlib.pyplot as plt
 import numpy
@@ -212,7 +212,7 @@ def print_params(fp, print_commit_hash=False, plot=False,
             newerrs[:, 1:3] = errs
             errs = newerrs
 
-        #plt.subplot(2 if huc is not None else 1, 1, 1)
+        # plt.subplot(2 if huc is not None else 1, 1, 1)
 
         # Plot Global Pixels % error
         plt.subplot(3, 1, 1)
@@ -247,7 +247,6 @@ def print_params(fp, print_commit_hash=False, plot=False,
         plt.ylabel('Mean IoU error %')
         plt.legend(loc='best', fancybox=True, framealpha=0.1)
 
-
         if huc is not None:
             plt.subplot(2, 1, 2)
             scale = float(len(errs)) / len(huc)
@@ -261,31 +260,20 @@ def print_params(fp, print_commit_hash=False, plot=False,
         for e, c, iou in zip(errs, conf_matrices, iou_indeces):
             i += 1
 
-            train_global_acc, \
-             train_mean_class_acc, \
-             train_mean_iou_index, \
-             valid_global_acc, \
-             valid_mean_class_acc, \
-             valid_mean_iou_index, \
-             test_global_acc, \
-             test_mean_class_acc, \
-             test_mean_iou_index = e
+            (train_global_acc, train_mean_class_acc, train_mean_iou_index,
+             valid_global_acc, valid_mean_class_acc, valid_mean_iou_index,
+             test_global_acc, test_mean_class_acc, test_mean_iou_index) = e
 
-            train_conf_matrix_norm, \
-             valid_conf_matrix_norm, \
-             test_conf_matrix_norm, \
-             train_conf_matrix, \
-             valid_conf_matrix, \
-             test_conf_matrix = c
+            (train_conf_matrix_norm, valid_conf_matrix_norm,
+             test_conf_matrix_norm, train_conf_matrix, valid_conf_matrix,
+             test_conf_matrix) = c
 
-            train_iou_index, \
-             valid_iou_index,\
-             test_iou_index = iou
-            print ""
-            print ""
-            print ""
-            print ""
+            (train_iou_index, valid_iou_index, test_iou_index) = iou
 
+            print ""
+            print ""
+            print ""
+            print ""
             headers_acc = ["Global Accuracies",
                            "Mean Class Accuracies",
                            "Mean Intersection Over Union"]
@@ -339,30 +327,52 @@ def print_params(fp, print_commit_hash=False, plot=False,
 
 
 if __name__ == '__main__':
-    if len(sys.argv) == 3:
-        name = sys.argv[1]
-        n = sys.argv[2]
-        get_all(name + '_models/model_recseg_' + name + n + '.npz.pkl')
+    parser = argparse.ArgumentParser(
+        description='Show the desired parameters of the network')
+    parser.add_argument(
+        'dataset',
+        default='horses',
+        help='The name of the esperiment.')
+    parser.add_argument(
+        'experiment',
+        default='',
+        help='The of the esperiment.')
+    parser.add_argument(
+        '--model',
+        default='model_recseg',
+        help='The name of the model.')
+    parser.add_argument(
+        '--cycle',
+        '-c',
+        action='store_true',
+        help='Boolean. If True will cycle through all the available '
+             'saved models.')
+    parser.add_argument(
+        '--skip',
+        '-s',
+        nargs='*',
+        default=[39, 40, 45, 48],
+        help='List of experiment to skip')
+
+    args = parser.parse_args()
+    if not args.cycle:
+        get_all(args.dataset + '_models/' + args.model + '_' +
+                args.dataset + args.experiment + '.npz.pkl')
     else:
-        if len(sys.argv) == 2:
-            name = sys.argv[1]
-        else:
-            name = 'camvid'
         n = 0
         ok = 1
         while ok:
             n += 1
-            if n == 23:
-                continue
-            if n in [39, 40, 45, 48]:
+            if n in args.skip:
                 print ''
                 continue
-            ok = get_all('model_recseg_' + name + str(n) + '.npz.pkl', False,
-                         True)
+
+            ok = get_all(args.dataset + '_models/' + args.model + '_' +
+                         args.dataset + str(n) + '.npz.pkl', args.plot,
+                         args.print_history)
             if not ok:
-                ok = get_all('/Tmp/visin/model_recseg_' + name + str(n) +
-                             '.npz.pkl', False, True)
-            if not ok:
-                ok = get_all('camvid_models/model_recseg_' + name + str(n) +
-                             '.npz.pkl', False, True)
+                ok = get_all('/Tmp/visin/' + args.dataset + '_models/' +
+                             args.model + '_' + args.dataset + str(n) +
+                             '.npz.pkl', args.plot, args.print_history)
+
         print('Printed models from 1 to {}').format(n-1)
