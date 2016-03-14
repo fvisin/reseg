@@ -53,9 +53,12 @@ def print_params(fp, print_commit_hash=False, plot=False,
     if len(errs):
         min_valid = numpy.argmax(errs[:, 3])
         best = errs[min_valid]
-        best_test_class_acc = numpy.round(numpy.diagonal(
-            conf_matrices[min_valid][2]), 3)
-        best_test_iou_indeces = numpy.round(iou_indeces[min_valid][2], 3)
+        best_test_class_acc = (numpy.diagonal(conf_matrices[min_valid][2]) /
+                               conf_matrices[min_valid][2].sum(axis=1))
+
+        print best_test_class_acc
+
+        # best_test_iou_indeces = numpy.round(iou_indeces[min_valid][2], 3)
         if len(best) == 2:
             error = (" ", round(best[0], 6), round(best[3], 6))
         else:
@@ -200,7 +203,7 @@ def print_params(fp, print_commit_hash=False, plot=False,
     )
 
     if len(best_test_class_acc) > 0:
-        print "|".join(best_test_class_acc.astype(str))
+        print "|".join(numpy.round(best_test_class_acc, 3).astype(str))
 
     if 'recseg_git_commit' in fp and print_commit_hash:
         print("Recseg commit: %s" % fp['recseg_git_commit'])
@@ -264,11 +267,10 @@ def print_params(fp, print_commit_hash=False, plot=False,
              valid_global_acc, valid_mean_class_acc, valid_mean_iou_index,
              test_global_acc, test_mean_class_acc, test_mean_iou_index) = e
 
-            (train_conf_matrix_norm, valid_conf_matrix_norm,
-             test_conf_matrix_norm, train_conf_matrix, valid_conf_matrix,
+            (train_conf_matrix, valid_conf_matrix,
              test_conf_matrix) = c
 
-            (train_iou_index, valid_iou_index, test_iou_index) = iou
+            # (train_iou_index, valid_iou_index, test_iou_index) = iou
 
             print ""
             print ""
@@ -294,6 +296,13 @@ def print_params(fp, print_commit_hash=False, plot=False,
                          round(test_mean_iou_index, 6)])
 
             print(tabulate(rows, headers=headers_acc))
+
+            train_conf_matrix_norm = (train_conf_matrix /
+                                      train_conf_matrix.sum(axis=1))
+            valid_conf_matrix_norm = (valid_conf_matrix /
+                                      valid_conf_matrix.sum(axis=1))
+            test_conf_matrix_norm = (test_conf_matrix /
+                                     test_conf_matrix.sum(axis=1))
 
             class_acc = list()
             class_acc.append(numpy.concatenate([["Train"], numpy.round(
