@@ -36,6 +36,7 @@ class ReSegLayer(lasagne.layers.Layer):
                  in_W_init=lasagne.init.GlorotUniform(),
                  in_b_init=lasagne.init.Constant(0.),
                  in_nonlinearity=lasagne.nonlinearities.rectify,
+                 in_vgg_layer='conv3_3',
                  # common recurrent layer params
                  RecurrentNet=lasagne.layers.GRULayer,
                  nonlinearity=lasagne.nonlinearities.rectify,
@@ -182,6 +183,7 @@ class ReSegLayer(lasagne.layers.Layer):
         self.in_W_init = in_W_init
         self.in_b_init = in_b_init
         self.in_nonlinearity = in_nonlinearity
+        self.in_vgg_layer = in_vgg_layer
         # common recurrent layer params
         self.RecurrentNet = RecurrentNet
         self.nonlinearity = nonlinearity
@@ -238,7 +240,7 @@ class ReSegLayer(lasagne.layers.Layer):
         # Pretrained vgg16
         elif in_nfilters == 'vgg':
             from vgg16 import buildVgg16
-            l_conv = buildVgg16(l_in, 'conv3_3', False)
+            l_conv = buildVgg16(l_in, in_vgg_layer, False)
             hypotetical_fm_size /= 4
             expand_height = expand_width = 4
             # Get vgg sublayers (without previous layers)

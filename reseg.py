@@ -74,6 +74,7 @@ def buildReSeg(input_shape, input_var,
                in_W_init=lasagne.init.GlorotUniform(),
                in_b_init=lasagne.init.Constant(0.),
                in_nonlinearity=lasagne.nonlinearities.rectify,
+               in_vgg_layer=in_vgg_layer,
                # common recurrent layer params
                RecurrentNet=lasagne.layers.GRULayer,
                nonlinearity=lasagne.nonlinearities.rectify,
@@ -140,6 +141,7 @@ def buildReSeg(input_shape, input_var,
                          in_W_init=in_W_init,
                          in_b_init=in_b_init,
                          in_nonlinearity=in_nonlinearity,
+                         in_vgg_layer=in_vgg_layer,
                          # common recurrent layer params
                          RecurrentNet=RecurrentNet,
                          nonlinearity=nonlinearity,
@@ -332,6 +334,7 @@ def train(saveto='model.npz',
           in_W_init=lasagne.init.GlorotUniform(),
           in_b_init=lasagne.init.Constant(0.),
           in_nonlinearity=lasagne.nonlinearities.rectify,
+          in_vgg_layer='conv3_3',
 
           # RNNs layers
           dim_proj=[32, 32],
@@ -512,6 +515,7 @@ def train(saveto='model.npz',
     in_W_init = options['in_W_init']
     in_b_init = options['in_b_init']
     in_nonlinearity = options['in_nonlinearity']
+    in_vgg_layer = options['in_vgg_layer']
 
     # RNNs layers
     dim_proj = options['dim_proj']
@@ -769,6 +773,7 @@ def train(saveto='model.npz',
                        in_W_init=in_W_init,
                        in_b_init=in_b_init,
                        in_nonlinearity=in_nonlinearity,
+                       in_vgg_layer=in_vgg_layer,
                        # common recurrent layer params
                        RecurrentNet=RecurrentNet,
                        nonlinearity=nonlinearity,

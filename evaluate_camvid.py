@@ -14,6 +14,7 @@ def main(job_id, params):
         in_W_init=params['in-W-init'],
         in_b_init=params['in-b-init'],
         in_nonlinearity=params['in-nonlinearity'],
+        in_vgg_layer=params['in_vgg_layer'],
 
         # RNNs layers
         dim_proj=params['dim-proj'],
@@ -138,6 +139,7 @@ if __name__ == '__main__':
         'in-W-init': lasagne.init.GlorotUniform(),
         'in-b-init': lasagne.init.Constant(0.),
         'in-nonlinearity': lasagne.nonlinearities.rectify,
+        'in_vgg_layer': 'conv3_3',
 
         # RNNs layers
         'dim-proj': [100, 100],
