@@ -240,7 +240,7 @@ class ReSegLayer(lasagne.layers.Layer):
         # Pretrained vgg16
         elif in_nfilters == 'vgg':
             from vgg16 import Vgg16Layer
-            l_conv = Vgg16Layer(l_in, 'pool3', False, 'concat3', False)
+            l_conv = Vgg16Layer(l_in, self.in_vgg_layer, False, False)
             hypotetical_fm_size /= 8
             expand_height = expand_width = 8
             self.sublayers.append(l_conv)

@@ -74,7 +74,7 @@ def buildReSeg(input_shape, input_var,
                in_W_init=lasagne.init.GlorotUniform(),
                in_b_init=lasagne.init.Constant(0.),
                in_nonlinearity=lasagne.nonlinearities.rectify,
-               in_vgg_layer=in_vgg_layer,
+               in_vgg_layer='concat3',
                # common recurrent layer params
                RecurrentNet=lasagne.layers.GRULayer,
                nonlinearity=lasagne.nonlinearities.rectify,

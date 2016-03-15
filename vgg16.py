@@ -18,7 +18,6 @@ import lasagne.layers
 from lasagne.layers import (InputLayer, DenseLayer,
                             NonlinearityLayer, ConcatLayer)
 from lasagne.nonlinearities import softmax
-from lasagne.layers import get_output_shape, get_output
 from padded import PaddedConv2DLayer
 from padded import PaddedPool2DLayer
 import theano
@@ -28,17 +27,14 @@ class Vgg16Layer(lasagne.layers.Layer):
     def __init__(self,
                  l_in=InputLayer((None, 3, 224, 224)),
                  get_layer='prob',
-                 use_concat_layers=False,
-                 get_concat_layer='concat3',
                  padded=True,
-                 trainable=False, regularizable=False,
+                 trainable=False,
+                 regularizable=False,
                  name='vgg'):
 
         super(Vgg16Layer, self).__init__(l_in, name)
         self.l_in = l_in
         self.get_layer = get_layer
-        self.use_concat_layers = use_concat_layers
-        self.get_concat_layer = get_concat_layer
         self.padded = padded
         self.trainable = trainable
         self.regularizable = regularizable
@@ -90,7 +86,8 @@ class Vgg16Layer(lasagne.layers.Layer):
             net['conv5_1'], 512, 3, pad=1, flip_filters=False)
         net['conv5_3'] = ConvLayer(
             net['conv5_2'], 512, 3, pad=1, flip_filters=False)
-        net['pool5'] = PoolLayer(net['conv5_3'], 2)
+        net['pool5'] = PoolLayer(
+            net['conv5_3'], 2)
 
         if 'fc' in get_layer or get_layer == 'prob':
             net['fc6'] = DenseLayer(net['pool5'], num_units=4096)
@@ -100,57 +97,24 @@ class Vgg16Layer(lasagne.layers.Layer):
                                     nonlinearity=None)
             net['prob'] = NonlinearityLayer(net['fc8'], softmax)
 
-        if use_concat_layers:
-            # concatenation of different feature maps
-            concat_net = OrderedDict()
-            concat_net['input'] = net['bgr']
-
-            concat_net['conv1'] = ConvLayer(
-                concat_net['input'], 64, 2, pad=0, stride=2,
-                flip_filters=False)
-
-            concat_net['pool1'] = net['pool1']
-            concat_net['concat1'] = ConcatLayer(
-                [concat_net['conv1'], concat_net['pool1']], axis=1,
-                name='concat1')
-
-            concat_net['conv2'] = ConvLayer(
-                concat_net['concat1'], 128, 2, pad=0, stride=2,
-                flip_filters=False)
-
-            concat_net['pool2'] = net['pool2']
-            concat_net['concat2'] = ConcatLayer(
-                [concat_net['conv2'], concat_net['pool2']], axis=1,
-                name='concat2')
-
-            concat_net['conv3'] = ConvLayer(
-                concat_net['concat2'], 256, 2, pad=0, stride=2,
-                flip_filters=False)
-
-            concat_net['pool3'] = net['pool3']
-            concat_net['concat3'] = ConcatLayer(
-                [concat_net['conv3'], concat_net['pool3']], axis=1,
-                name='concat3')
-
-            concat_net['conv4'] = ConvLayer(
-                concat_net['concat3'], 512, 2, pad=0, stride=2,
-                flip_filters=False)
-            concat_net['pool4'] = net['pool4']
-            concat_net['concat4'] = ConcatLayer(
-                [concat_net['conv4'], concat_net['pool4']], axis=1,
-                name='concat4')
-
-            reached = False
-            # Collect garbage
-            for el in concat_net.iteritems():
-                if reached:
-                    del(concat_net[el[0]])
-                if el[0] == get_concat_layer:
-                    reached = True
-
-            # Set names to layers
-            for name in concat_net.keys():
-                concat_net[name].name = 'vgg16_merge_' + name
+        self.concat_sublayers = []
+        if 'concat' in get_layer:
+            n_pool = get_layer[6:]
+            get_layer = 'pool' + str(n_pool)
+            l_conv = net['input']
+            for i in range(int(n_pool)):
+                n_filters = net['conv' + str(i+1) + '_1'].num_filters
+                l_conv = ConvLayer(
+                    l_conv, n_filters, 2, pad=0, stride=2, flip_filters=True,
+                    name='vgg16_skipconnection_conv_' + str(i+1))
+                self.concat_sublayers.append(l_conv)
+            l_out = ConcatLayer(
+                (l_conv, net[get_layer]), axis=1,
+                name='vgg16_skipconnection_concat')
+            self.concat_sublayers.append(l_out)
+            out_layer = l_out
+        else:
+            out_layer = net[get_layer]
 
         reached = False
         # Collect garbage
@@ -159,15 +123,18 @@ class Vgg16Layer(lasagne.layers.Layer):
                 del(net[el[0]])
             if el[0] == get_layer:
                 reached = True
+        self.sublayers = net
 
         # Set names to layers
         for name in net.keys():
-            net[name].name = 'vgg16_' + name
+            if not net[name].name:
+                net[name].name = 'vgg16_' + name
 
         # Reload weights
         nparams = len(lasagne.layers.get_all_params(net.values()))
         with open('w_vgg16.pkl', 'rb') as f:
-            # Note: in python3 use the pickle.load parameter `encoding='latin-1'`
+            # Note: in python3 use the pickle.load parameter
+            # `encoding='latin-1'`
             vgg16_w = pickle.load(f)['param values']
         lasagne.layers.set_all_param_values(net.values(), vgg16_w[:nparams])
 
@@ -175,27 +142,24 @@ class Vgg16Layer(lasagne.layers.Layer):
         if not trainable or not regularizable:
             all_layers = net.values()
             for vgg_layer in all_layers:
-                layer_params = vgg_layer.get_params()
-                for p in layer_params:
-                    if not regularizable:
-                        try:
-                            vgg_layer.params[p].remove('regularizable')
-                        except KeyError:
-                            pass
-                    if not trainable:
-                        try:
-                            vgg_layer.params[p].remove('trainable')
-                        except KeyError:
-                            pass
+                if 'concat' not in vgg_layer.name:
+                    layer_params = vgg_layer.get_params()
+                    for p in layer_params:
+                        if not regularizable:
+                            try:
+                                vgg_layer.params[p].remove('regularizable')
+                            except KeyError:
+                                pass
+                        if not trainable:
+                            try:
+                                vgg_layer.params[p].remove('trainable')
+                            except KeyError:
+                                pass
 
-        if use_concat_layers:
-            self.out_layer = concat_net[get_concat_layer]
-            self.sublayers = concat_net
-        else:
-            self.out_layer = net[get_layer]
-            self.sublayers = net
+        # save the vgg sublayers
+        self.out_layer = out_layer
 
-         # HACK LASAGNE
+        # HACK LASAGNE
         # This will set `self.input_layer`, which is needed by Lasagne to find
         # the layers with the get_all_layers() helper function in the
         # case of a layer with sublayers
@@ -204,25 +168,26 @@ class Vgg16Layer(lasagne.layers.Layer):
         else:
             self.input_layer = self.out_layer
 
-    def get_output_shape_for(self, input_shape):
-        for name, layer in self.sublayers.items():
-            if not self.use_concat_layers and 'input' in name:
-                continue
-            if self.use_concat_layers and 'pool' in name:
-                continue
-            if self.use_concat_layers and 'concat' in name:
-                input_shape = (input_shape, input_shape)
-
-            output_shape = layer.get_output_shape_for(input_shape)
-            input_shape = output_shape
-        return output_shape
-
     def get_output_for(self, input_var, **kwargs):
         # HACK LASAGNE
         # This is needed, jointly with the previous hack, to ensure that
         # this layer behaves as its last sublayer (namely,
         # self.input_layer)
         return input_var
+
+    def get_output_shape_for(self, input_shape):
+        c_input_shape = input_shape
+        # iterate through vgg
+        for name, layer in self.sublayers.items()[1:]:
+            output_shape = layer.get_output_shape_for(input_shape)
+            input_shape = output_shape
+        # iterate through the parallel network if any
+        for layer in self.concat_sublayers:
+            if isinstance(layer, ConcatLayer):
+                c_input_shape = (c_input_shape, input_shape)
+            output_shape = layer.get_output_shape_for(c_input_shape)
+            c_input_shape = output_shape
+        return output_shape
 
 
 class RGBtoBGRLayer(lasagne.layers.Layer):
