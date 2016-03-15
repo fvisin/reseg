@@ -378,14 +378,7 @@ class ReSegLayer(lasagne.layers.Layer):
                 if batch_norm:
                     l_upsampling = lasagne.layers.batch_norm(
                         l_upsampling,
-                        axes='auto',
-                        epsilon=1e-4,
-                        alpha=0.1,
-                        mode='low_mem',
-                        beta=lasagne.init.Constant(0),
-                        gamma=lasagne.init.Constant(1),
-                        mean=lasagne.init.Constant(0),
-                        inv_std=lasagne.init.Constant(1))
+                        axes='auto')
                     self.sublayers.append(l_upsampling)
                     print "Batch normalization after Grad layer "
 
@@ -416,14 +409,7 @@ class ReSegLayer(lasagne.layers.Layer):
             if batch_norm:
                 l_upsampling = lasagne.layers.batch_norm(
                     l_upsampling,
-                    axes=(0, 1, 2),
-                    epsilon=1e-4,
-                    alpha=0.1,
-                    mode='low_mem',
-                    beta=lasagne.init.Constant(0),
-                    gamma=lasagne.init.Constant(1),
-                    mean=lasagne.init.Constant(0),
-                    inv_std=lasagne.init.Constant(1))
+                    axes=(0, 1, 2))
 
                 self.sublayers.append(l_upsampling)
                 print "Batch normalization after Linear upsampling layer "

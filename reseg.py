@@ -184,6 +184,9 @@ def buildReSeg(input_shape, input_var,
             b=out_b_init,
             nonlinearity=None
         )
+        if batch_norm:
+            l_out = lasagne.layers.batch_norm(l_out, axes='auto')
+
     # Go to b01c
     l_out = lasagne.layers.DimshuffleLayer(
         l_out,
