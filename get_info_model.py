@@ -1,7 +1,6 @@
 import argparse
 import collections
 import cPickle as pkl
-import os
 
 import matplotlib.pyplot as plt
 import numpy
@@ -10,29 +9,38 @@ from tabulate import tabulate
 from config_datasets import headers_datasets
 
 
-def get_all(in_filename='model_recseg_camvid.npz.pkl', plot=True,
-            multiple=False):
-    filename = in_filename
-    print filename
-    if not os.path.isfile(filename):
+def print_pkl_params(pkl_path, *args):
+    """Loads a parameter pkl archive and prints the parameters
+
+    Parameters
+    ----------
+    pkl_path : string
+        The path of the .pkl parameter archive.
+    *args : dict
+        The arguments to print_params.
+    """
+    try:
+        options = pkl.load(open(pkl_path, 'rb'))
+    except IOError:
+        print "Couldn't load " + pkl_path
         return 0
-    fp = pkl.load(open(filename, 'rb'))
-    print_params(fp, print_commit_hash=not multiple, plot=True,
-                 print_history=True)
+    return print_params(options, *args)
 
 
 def print_params(fp, print_commit_hash=False, plot=False,
-                 print_history=False):
+                 print_history=False, print_best_class_accuracy=False):
     """Prints the parameter of the model
 
     Parameters
     ----------
-    fp : dictionary
-        The parameters dictionary
-    parameter_only : bool
-        If True, the commit hash
-    plot : blot
+    fp : dict
+        The dictionary of the model's parameters
+    print_commit_hash : bool
+        If True, the commit hash will be printed
+    plot : bool
         If True, the error curves will be plotted
+    print_history : bool
+        If True the history of the accuracies will be printed
     """
     dataset = fp.get("dataset", "camvid")
 
@@ -53,20 +61,25 @@ def print_params(fp, print_commit_hash=False, plot=False,
     if len(errs):
         min_valid = numpy.argmax(errs[:, 3])
         best = errs[min_valid]
-        best_test_class_acc = (numpy.diagonal(conf_matrices[min_valid][2]) /
-                               conf_matrices[min_valid][2].sum(axis=1))
+        best_test_class_acc = numpy.round(
+            numpy.diagonal(conf_matrices[min_valid][2]) /
+            conf_matrices[min_valid][2].sum(axis=1), 3)
 
-        print best_test_class_acc
+        if len(best_test_class_acc) > 0 and print_best_class_accuracy:
+            best_per_class_accuracy = "|".join(
+                best_test_class_acc.astype('str'))
+        else:
+            best_per_class_accuracy = ''
 
         # best_test_iou_indeces = numpy.round(iou_indeces[min_valid][2], 3)
         if len(best) == 2:
-            error = (" ", round(best[0], 6), round(best[3], 6))
+            error = (" ", round(best[0], 3), round(best[3], 3))
         else:
-            error = (round(best[0], 6), round(best[3], 6),
-                     round(best[6], 6), round(best[7], 6), round(best[8], 6))
+            error = (round(best[0], 3), round(best[3], 3),
+                     round(best[6], 3), round(best[7], 3), round(best[8], 3))
     else:
         error = [' ', ' ', ' ', ' ', ' ']
-        best_test_class_acc = []
+        best_per_class_accuracy = ''
 
     if 'history_unoptimized_cost' in fp:
         huc = fp['history_unoptimized_cost']
@@ -99,7 +112,7 @@ def print_params(fp, print_commit_hash=False, plot=False,
           "{14}|{15}|{16}|{17}|{18}|{19}|{20}|{21}|{22}|{23}|{24}|{25}|"
           "{26}|{27}|{28}|{29}|{30}|{31}|{32}|{33}|{34}|{35}|{36}|{37}|"
           "{38}|{39}|{40}|{41}|{42}|{43}|{44}|{45}|{46}|{47}|{48}|{49}|"
-          "{50}|{51}|"
+          "{50}|{51}|{52}"
           ).format(
 
         # Batch fp
@@ -199,14 +212,18 @@ def print_params(fp, print_commit_hash=False, plot=False,
         error[1],
         error[2],
         error[3],
-        error[4]
+        error[4],
+        best_per_class_accuracy
     )
-
-    if len(best_test_class_acc) > 0:
-        print "|".join(numpy.round(best_test_class_acc, 3).astype(str))
 
     if 'recseg_git_commit' in fp and print_commit_hash:
         print("Recseg commit: %s" % fp['recseg_git_commit'])
+    if 'recseg_version' in fp and print_commit_hash:
+        print("Recseg commit: %s" % fp['recseg_version'])
+    if 'lasagne_version' in fp and print_commit_hash:
+        print("Lasagne commit: %s" % fp['lasagne_version'])
+    if 'theano_version' in fp and print_commit_hash:
+        print("theano commit: %s" % fp['theano_version'])
 
     # plot error curves
     if plot:
@@ -259,17 +276,13 @@ def print_params(fp, print_commit_hash=False, plot=False,
             plt.grid(True)
         plt.show()
     if print_history:
-        i = 0
-        for e, c, iou in zip(errs, conf_matrices, iou_indeces):
-            i += 1
+        for i, (e, c, iou) in enumerate(zip(errs, conf_matrices, iou_indeces)):
 
             (train_global_acc, train_mean_class_acc, train_mean_iou_index,
              valid_global_acc, valid_mean_class_acc, valid_mean_iou_index,
              test_global_acc, test_mean_class_acc, test_mean_iou_index) = e
 
-            (train_conf_matrix, valid_conf_matrix,
-             test_conf_matrix) = c
-
+            (train_conf_matrix, valid_conf_matrix, test_conf_matrix) = c
             # (train_iou_index, valid_iou_index, test_iou_index) = iou
 
             print ""
@@ -345,7 +358,29 @@ if __name__ == '__main__':
     parser.add_argument(
         'experiment',
         default='',
+        nargs='?',
         help='The of the esperiment.')
+    parser.add_argument(
+        '--plot',
+        '-p',
+        action='store_true',
+        help='Boolean. If set will plot the training curves')
+    parser.add_argument(
+        '--print-error-history',
+        '-peh',
+        action='store_true',
+        help='Boolean. If set will print the value of the different '
+             'metrics in every epoch')
+    parser.add_argument(
+        '--print_best_class_accuracy',
+        '-pca',
+        action='store_true',
+        help='Boolean. If set will print the best per-class accuracy')
+    parser.add_argument(
+        '--print-commit-hash',
+        '-ph',
+        action='store_true',
+        help='Boolean. If set will print the commit hash')
     parser.add_argument(
         '--model',
         default='model_recseg',
@@ -354,19 +389,23 @@ if __name__ == '__main__':
         '--cycle',
         '-c',
         action='store_true',
-        help='Boolean. If True will cycle through all the available '
+        help='Boolean. If set will cycle through all the available '
              'saved models.')
     parser.add_argument(
         '--skip',
         '-s',
         nargs='*',
-        default=[39, 40, 45, 48],
-        help='List of experiment to skip')
+        type=int,
+        default=[],
+        help='List of experiment to skip from the cycle')
 
     args = parser.parse_args()
     if not args.cycle:
-        get_all(args.dataset + '_models/' + args.model + '_' +
-                args.dataset + args.experiment + '.npz.pkl')
+        print_pkl_params(args.dataset + '_models/' + args.model + '_' +
+                         args.dataset + args.experiment + '.npz.pkl',
+                         args.print_commit_hash, args.plot,
+                         args.print_error_history,
+                         args.print_best_class_accuracy)
     else:
         n = 0
         ok = 1
@@ -375,13 +414,17 @@ if __name__ == '__main__':
             if n in args.skip:
                 print ''
                 continue
-
-            ok = get_all(args.dataset + '_models/' + args.model + '_' +
-                         args.dataset + str(n) + '.npz.pkl', args.plot,
-                         args.print_history)
+            ok = print_pkl_params(args.dataset + '_models/' + args.model +
+                                  '_' + args.dataset + str(n) + '.npz.pkl',
+                                  args.print_commit_hash, args.plot,
+                                  args.print_error_history,
+                                  args.print_best_class_accuracy)
             if not ok:
-                ok = get_all('/Tmp/visin/' + args.dataset + '_models/' +
-                             args.model + '_' + args.dataset + str(n) +
-                             '.npz.pkl', args.plot, args.print_history)
+                ok = print_pkl_params('/Tmp/visin/' + args.dataset +
+                                      '_models/' + args.model + '_' +
+                                      args.dataset + str(n) + '.npz.pkl',
+                                      args.print_commit_hash, args.plot,
+                                      args.print_error_history,
+                                      args.print_best_class_accuracy)
 
         print('Printed models from 1 to {}').format(n-1)
