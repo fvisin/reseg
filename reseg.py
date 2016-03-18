@@ -473,7 +473,8 @@ def train(saveto='model.npz',
     options = locals().copy()
 
     # Repositories hash
-    options['recseg_version'] = check_output('git rev-parse HEAD', shell=True)
+    options['recseg_version'] = check_output('git rev-parse HEAD',
+                                             shell=True)[:-1]
     options['lasagne_version'] = lasagne.__version__
     options['theano_version'] = theano.__version__
 
