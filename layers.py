@@ -239,15 +239,11 @@ class ReSegLayer(lasagne.layers.Layer):
 
         # Pretrained vgg16
         elif in_nfilters == 'vgg':
-            from vgg16 import buildVgg16
-            l_conv = buildVgg16(l_in, in_vgg_layer, False)
-            hypotetical_fm_size /= 4
-            expand_height = expand_width = 4
-            # Get vgg sublayers (without previous layers)
-            vgg_sublayers = get_all_layers(l_conv)
-            bgr = next(l for l in vgg_sublayers if l.name == 'vgg16_bgr')
-            vgg_sublayers = vgg_sublayers[vgg_sublayers.index(bgr):]
-            self.sublayers.extend(vgg_sublayers)
+            from vgg16 import Vgg16Layer
+            l_conv = Vgg16Layer(l_in, 'pool3', False, 'concat3', False)
+            hypotetical_fm_size /= 8
+            expand_height = expand_width = 8
+            self.sublayers.append(l_conv)
 
         # ReNet layers
         l_renet = l_conv
