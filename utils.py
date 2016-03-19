@@ -287,6 +287,8 @@ def retry_if_io_error(exception):
 @retry(stop_max_attempt_number=10, wait_fixed=2000,
        retry_on_exception=retry_if_io_error)
 def save_with_retry(saveto, args):
+    if not os.path.exists(os.path.dirname(saveto)):
+        os.makedirs(os.path.dirname(saveto))
     np.savez(saveto, *args)
 
 
