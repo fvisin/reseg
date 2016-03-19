@@ -74,7 +74,6 @@ def buildReSeg(input_shape, input_var,
                in_W_init=lasagne.init.GlorotUniform(),
                in_b_init=lasagne.init.Constant(0.),
                in_nonlinearity=lasagne.nonlinearities.rectify,
-               in_vgg_layer='concat3',
                # common recurrent layer params
                RecurrentNet=lasagne.layers.GRULayer,
                nonlinearity=lasagne.nonlinearities.rectify,
@@ -141,7 +140,6 @@ def buildReSeg(input_shape, input_var,
                          in_W_init=in_W_init,
                          in_b_init=in_b_init,
                          in_nonlinearity=in_nonlinearity,
-                         in_vgg_layer=in_vgg_layer,
                          # common recurrent layer params
                          RecurrentNet=RecurrentNet,
                          nonlinearity=nonlinearity,
@@ -334,7 +332,6 @@ def train(saveto='model.npz',
           in_W_init=lasagne.init.GlorotUniform(),
           in_b_init=lasagne.init.Constant(0.),
           in_nonlinearity=lasagne.nonlinearities.rectify,
-          in_vgg_layer='conv3_3',
 
           # RNNs layers
           dim_proj=[32, 32],
@@ -516,7 +513,6 @@ def train(saveto='model.npz',
     in_W_init = options['in_W_init']
     in_b_init = options['in_b_init']
     in_nonlinearity = options['in_nonlinearity']
-    in_vgg_layer = options['in_vgg_layer']
 
     # RNNs layers
     dim_proj = options['dim_proj']
@@ -649,7 +645,7 @@ def train(saveto='model.npz',
 
     # Default: input is float btw 0 and 1
     # If we use vgg convnet the input should be 0:255
-    input_to_float = False if in_nfilters == 'vgg' else True
+    input_to_float = False if type(in_nfilters) == str else True
     train, valid, test = preprocess_dataset(train, valid, test,
                                             input_to_float,
                                             preprocess_type,
@@ -774,7 +770,6 @@ def train(saveto='model.npz',
                        in_W_init=in_W_init,
                        in_b_init=in_b_init,
                        in_nonlinearity=in_nonlinearity,
-                       in_vgg_layer=in_vgg_layer,
                        # common recurrent layer params
                        RecurrentNet=RecurrentNet,
                        nonlinearity=nonlinearity,

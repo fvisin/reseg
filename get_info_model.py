@@ -112,7 +112,7 @@ def print_params(fp, print_commit_hash=False, plot=False,
           "{14}|{15}|{16}|{17}|{18}|{19}|{20}|{21}|{22}|{23}|{24}|{25}|"
           "{26}|{27}|{28}|{29}|{30}|{31}|{32}|{33}|{34}|{35}|{36}|{37}|"
           "{38}|{39}|{40}|{41}|{42}|{43}|{44}|{45}|{46}|{47}|{48}|{49}|"
-          "{50}|{51}|{52}"
+          "{50}|{51}|{52}|"
           ).format(
 
         # Batch fp
@@ -141,7 +141,7 @@ def print_params(fp, print_commit_hash=False, plot=False,
         fp['do_random_invert_color'],
 
         # Input Conv layers
-        fp['in_nfilters'],
+        fp['in_vgg_layer'] if 'in_vgg_layer' in fp else fp['in_nfilters'],
         fp['in_filters_size'] if isinstance(fp['in_nfilters'],
                                             collections.Iterable) else ' ',
         fp['in_filters_stride'] if isinstance(fp['in_nfilters'],
