@@ -235,7 +235,7 @@ class ReSegLayer(lasagne.layers.Layer):
 
                 # Print shape
                 out_shape = get_output_shape(l_conv)
-                print('RecSeg: After in-convnet: {}'.format(out_shape))
+                print('ConvNet: After in-convnet: {}'.format(out_shape))
 
         # Pretrained vgg16
         elif type(in_nfilters) == str:
@@ -244,6 +244,9 @@ class ReSegLayer(lasagne.layers.Layer):
             hypotetical_fm_size /= 8
             expand_height = expand_width = 8
             self.sublayers.append(l_conv)
+            # Print shape
+            out_shape = get_output_shape(l_conv)
+            print('Vgg: After vgg: {}'.format(out_shape))
 
         # ReNet layers
         l_renet = l_conv
