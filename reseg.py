@@ -846,6 +846,7 @@ def train(saveto='model.npz',
                        redirect_stdout=True).start()
 
     # Epochs loop
+    valid_wait = 10
     for eidx in range(options['uidx'], max_epochs):
         nsamples = 0
         epoch_cost = 0
@@ -985,7 +986,7 @@ def train(saveto='model.npz',
                 return valid_global_acc, test_global_acc
 
             # Check predictions' accuracy
-            if np.mod(uidx, validFreq) == 0:
+            if np.mod(uidx, validFreq) == 0 and valid_wait == 0:
                 valid_global_acc, test_global_acc = validate_model()
 
                 # Did we improve *validation* accuracy?
@@ -1014,6 +1015,8 @@ def train(saveto='model.npz',
                     if patience_counter == patience / validFreq:
                         print 'Early Stop!'
                         estop = True
+            else:
+                valid_wait -= 1
 
             # Save model parameters
             if save or np.mod(uidx, saveFreq) == 0:
