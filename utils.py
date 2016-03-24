@@ -109,7 +109,7 @@ def validate(f_pred,
     """
     # check if the dataset is empty
     if len(data) == 0 or len(samples_ids) == 0:
-        return 0., [], [], 0., [], 0.
+        return 0., [], 0., [], 0.
 
     seg_path = os.path.join('segmentations', dataset,
                             saveto.split('/')[-1][:-4])
@@ -148,7 +148,8 @@ def validate(f_pred,
         preds = f_pred(mini_x.astype(floatX))
 
         # just for visualization
-        mini_x = (mini_x / 255.).astype(floatX)
+        if np.max(mini_x) > 1:
+            mini_x = (mini_x / 255.).astype(floatX)
 
         # Compute the confusion matrix for each image
         cf_m = confusion_matrix(mini_y.flatten(), preds.flatten(),
