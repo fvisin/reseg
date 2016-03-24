@@ -73,6 +73,35 @@ headers_camvid = ["Sky", "Building", "Column_Pole", "Road", "Sidewalk",
                   "Tree", "SignSymbol", "Fence", "Car", "Pedestrian",
                   "Bicyclist", "Void"]
 
+ ##### CITYSCAPES ##### #
+colormap_cityscapes = OrderedDict([
+    (0, np.array([128, 64, 128], dtype=np.uint8)),   # road
+    (1, np.array([244, 35, 232], dtype=np.uint8)),  # sidewalk
+    (2, np.array([70, 70, 70], dtype=np.uint8)),  # building
+    (3, np.array([102, 102, 156], dtype=np.uint8)),  # wall
+    (4, np.array([190, 153, 153], dtype=np.uint8)),  # fence
+    (5, np.array([153, 153, 153], dtype=np.uint8)),  # pole
+    (6, np.array([250, 170, 30], dtype=np.uint8)),  # traffic light
+    (7, np.array([220, 220,  0], dtype=np.uint8)),  # traffic sign
+    (8, np.array([107, 142, 35], dtype=np.uint8)),  # vegetation
+    (9, np.array([152, 251, 152], dtype=np.uint8)),  # terrain
+    (10, np.array([70, 130,180], dtype=np.uint8)),  # sky
+    (11, np.array([220, 20, 60], dtype=np.uint8)),  # person
+    (12, np.array([19, 0,  0], dtype=np.uint8)),   # rider
+    (13, np.array([0, 0, 142], dtype=np.uint8)),  # car
+    (14, np.array([0, 0, 70], dtype=np.uint8)),  # truck
+    (15, np.array([0, 60, 100], dtype=np.uint8)),  # bus
+    (16, np.array([0, 80, 100], dtype=np.uint8)),  # train
+    (17, np.array([0, 0, 230], dtype=np.uint8)),  # motorcycle
+    (18, np.array([119, 11, 32], dtype=np.uint8)),  # bycicle
+    (19, np.array([0, 0, 0], dtype=np.uint8))  # void
+])
+
+headers_cityscapes = ["Road", "Sidewalk", "Building", "Wall", "Fence",
+                      "Pole", "TrafficLight", "TrafficSign", "Vegetation",
+                      "Terrain", "Sky", "Person", "Rider", "Car", "Truck",
+                      "Bus", "Train", "Motorcycle", "Bycicle", "Void"]
+
 # ##### FASHIONISTA ##### #
 colormap_fashionista = OrderedDict([
     (0, np.array([128, 128, 128], dtype=np.uint8)),
@@ -229,6 +258,7 @@ except IOError:
 # DATASET DICTIONARIES #
 colormap_datasets = dict()
 colormap_datasets["camvid"] = colormap_camvid
+colormap_datasets["cityscapes"] = colormap_cityscapes
 colormap_datasets["daimler"] = colormap_daimler
 colormap_datasets["fashionista"] = colormap_fashionista
 colormap_datasets["flowers"] = colormap_flowers
@@ -245,6 +275,7 @@ colormap_datasets.update({'sunrgbd': colormap_sunrgbd})
 
 headers_datasets = dict()
 headers_datasets["camvid"] = headers_camvid
+headers_datasets["cityscapes"] = headers_cityscapes
 headers_datasets["daimler"] = headers_daimler
 headers_datasets["kitti_road"] = headers_kitti_road
 headers_datasets["horses"] = headers_horses
