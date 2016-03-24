@@ -169,7 +169,7 @@ def preprocess_dataset(train, valid, test,
                        preprocess_type,
                        patch_size, max_patches):
 
-    if input_to_float:
+    if input_to_float and preprocess_type is None:
         train_norm = train[0] / float(255)
         train = (train_norm, train[1])
         valid_norm = valid[0] / float(255)
@@ -198,6 +198,8 @@ def preprocess_dataset(train, valid, test,
             print "\rProgress: {0:.3g} %".format(i * 100 / len(train[0])),
             sys.stdout.flush()
 
+        if input_to_float:
+            train_pre = np.array(train_pre) / float(255)
         train = (np.array(train_pre), np.array(train[1]))
 
     if len(valid[0]) > 0:
@@ -217,6 +219,8 @@ def preprocess_dataset(train, valid, test,
             print "\rProgress: {0:.3g} %".format(i * 100 / len(valid[0])),
             sys.stdout.flush()
 
+        if input_to_float:
+            valid_pre = np.array(valid_pre) / float(255)
         valid = (np.array(valid_pre), np.array(valid[1]))
 
     if len(test[0]) > 0:
@@ -235,6 +239,9 @@ def preprocess_dataset(train, valid, test,
             test_pre.append(x_pre[0])
             print "\rProgress: {0:.3g} %".format(i * 100 / len(test[0])),
             sys.stdout.flush()
+
+        if input_to_float:
+            test_pre = np.array(test_pre) / float(255)
         test = (np.array(test_pre), np.array(test[1]))
 
     return train, valid, test
