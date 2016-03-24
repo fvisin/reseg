@@ -101,13 +101,13 @@ class Vgg16Layer(lasagne.layers.Layer):
         if 'concat' in get_layer:
             n_pool = get_layer[6:]
             get_layer = 'pool' + str(n_pool)
-            l_conv = net['conv1_1']
+            l_concat = net['conv1_1']
             for i in range(int(n_pool)):
                 l_conv = net['conv' + str(i+1) + '_1']
                 l_pool = net['pool' + str(i+1)]
 
                 l_new = ConvLayer(
-                    l_conv, l_conv.num_filters, 2, pad=0, stride=2,
+                    l_concat, l_conv.num_filters, 2, pad=0, stride=2,
                     flip_filters=True,
                     name='vgg16_skipconnection_conv_' + str(i+1))
                 self.concat_sublayers.append(l_new)
