@@ -170,11 +170,18 @@ def preprocess_dataset(train, valid, test,
                        patch_size, max_patches):
 
     if input_to_float and preprocess_type is None:
-        train_norm = train[0] / float(255)
+        train_norm = train[0].astype(floatX) / 255.
         train = (train_norm, train[1])
-        valid_norm = valid[0] / float(255)
+        valid_norm = valid[0].astype(floatX) / 255.
         valid = (valid_norm, valid[1])
-        test_norm = test[0] / float(255)
+        test_norm = test[0].astype(floatX) / 255.
+        test = (test_norm, test[1])
+    else:
+        train_norm = train[0].astype(floatX)
+        train = (train_norm, train[1])
+        valid_norm = valid[0].astype(floatX)
+        valid = (valid_norm, valid[1])
+        test_norm = test[0].astype(floatX)
         test = (test_norm, test[1])
 
     if preprocess_type is None:
@@ -199,7 +206,7 @@ def preprocess_dataset(train, valid, test,
             sys.stdout.flush()
 
         if input_to_float:
-            train_pre = np.array(train_pre) / float(255)
+            train_pre = np.array(train_pre).astype(floatX) / 255.
         train = (np.array(train_pre), np.array(train[1]))
 
     if len(valid[0]) > 0:
@@ -220,7 +227,7 @@ def preprocess_dataset(train, valid, test,
             sys.stdout.flush()
 
         if input_to_float:
-            valid_pre = np.array(valid_pre) / float(255)
+            valid_pre = np.array(valid_pre).astype(floatX) / 255.
         valid = (np.array(valid_pre), np.array(valid[1]))
 
     if len(test[0]) > 0:
@@ -241,7 +248,7 @@ def preprocess_dataset(train, valid, test,
             sys.stdout.flush()
 
         if input_to_float:
-            test_pre = np.array(test_pre) / float(255)
+            test_pre = np.array(test_pre).astype(floatX) / 255.
         test = (np.array(test_pre), np.array(test[1]))
 
     return train, valid, test
