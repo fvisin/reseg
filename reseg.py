@@ -418,7 +418,7 @@ def train(saveto='model.npz',
                       # elements of each split are saved. If n_save is an
                       # integer, n_save random elements for each split are
                       # saved. If n_save is -1, all the dataset is saved
-
+          valid_wait=0,
           # Batch params
           batch_size=8,
           valid_batch_size=1,
@@ -564,6 +564,7 @@ def train(saveto='model.npz',
     # Prediction, Softmax
     intermediate_pred = options['intermediate_pred']
     class_balance = options['class_balance']
+    valid_wait = options['valid_wait']
 
     # Special layers
     batch_norm = options['batch_norm']
@@ -851,7 +852,6 @@ def train(saveto='model.npz',
                        redirect_stdout=True).start()
 
     # Epochs loop
-    valid_wait = 10
     for eidx in range(options['uidx'], max_epochs):
         nsamples = 0
         epoch_cost = 0
@@ -991,37 +991,40 @@ def train(saveto='model.npz',
                 return valid_global_acc, test_global_acc
 
             # Check predictions' accuracy
-            if np.mod(uidx, validFreq) == 0 and valid_wait == 0:
-                valid_global_acc, test_global_acc = validate_model()
+            if np.mod(uidx, validFreq) == 0:
 
-                # Did we improve *validation* accuracy?
-                if (len(valid) > 0 and
-                    (len(history_acc) == 0 or valid_global_acc >= np.array(
-                        history_acc)[:, 3].max())):
+                if valid_wait == 0:
+                    valid_global_acc, test_global_acc = validate_model()
 
-                    # TODO check if CUDA variables!
-                    bestparams = lasagne.layers.get_all_param_values(l_out)
-                    patience_counter = 0
-                    save = True  # Save model params
-                else:
-                    # if validation set is empty check test set to save params
-                    if len(history_acc) == 0 or test_global_acc >= np.array(
-                            history_acc)[:, 6].max():
+                    # Did we improve *validation* accuracy?
+                    if (len(valid) > 0 and
+                        (len(history_acc) == 0 or valid_global_acc >= np.array(
+                            history_acc)[:, 3].max())):
+
                         # TODO check if CUDA variables!
-                        bestparams = lasagne.layers.get_all_param_values(
-                            l_out)
+                        bestparams = lasagne.layers.get_all_param_values(l_out)
                         patience_counter = 0
-                        # Save model params
-                        save = True
+                        save = True  # Save model params
+                    else:
+                        # if validation set is empty check test
+                        # set to save params
+                        if len(history_acc) == 0 or test_global_acc >= np.array(
+                                history_acc)[:, 6].max():
+                            # TODO check if CUDA variables!
+                            bestparams = lasagne.layers.get_all_param_values(
+                                l_out)
+                            patience_counter = 0
+                            # Save model params
+                            save = True
 
-                # Early stop if patience is over
-                if (eidx > min_epochs):
-                    patience_counter += 1
-                    if patience_counter == patience / validFreq:
-                        print 'Early Stop!'
-                        estop = True
-            else:
-                valid_wait -= 1
+                    # Early stop if patience is over
+                    if (eidx > min_epochs):
+                        patience_counter += 1
+                        if patience_counter == patience / validFreq:
+                            print 'Early Stop!'
+                            estop = True
+                else:
+                    valid_wait -= 1
 
             # Save model parameters
             if save or np.mod(uidx, saveFreq) == 0:
