@@ -34,6 +34,7 @@ import kitti_road
 import mscoco
 import nyu_depth
 import sunrgbd
+import cityscapes
 
 floatX = theano.config.floatX
 intX = 'uint8'
@@ -49,7 +50,8 @@ datasets = {'camvid': (camvid.load_data, camvid.properties),
             'kitti_road': (kitti_road.load_data, kitti_road.properties),
             'mscoco': (mscoco.load_data, mscoco.properties),
             'nyu_depth': (nyu_depth.load_data, nyu_depth.properties),
-            'sunrgbd': (sunrgbd.load_data, sunrgbd.properties)}
+            'sunrgbd': (sunrgbd.load_data, sunrgbd.properties),
+            'cityscapes': (cityscapes.load_data, cityscapes.properties)}
 
 
 def get_dataset(name):

@@ -1,5 +1,5 @@
 import numpy as np
-import os
+import os, sys
 
 from numpy import sqrt, prod, ones, floor, repeat, pi, exp, zeros, sum
 from numpy.random import RandomState
@@ -18,7 +18,6 @@ from skimage import img_as_float, img_as_ubyte, img_as_uint, img_as_int
 from skimage.color import label2rgb, rgb2hsv, hsv2rgb
 from skimage.io import ImageCollection, imsave, imshow
 from skimage.transform import resize
-
 
 def compare_mask_image_filenames(filenames_images, filenames_mask,
                                  replace_from='',
@@ -171,46 +170,72 @@ def preprocess_dataset(train, valid, test,
                        patch_size, max_patches):
 
     if input_to_float:
-        train_norm = train[0] / 255.
+        train_norm = train[0] / float(255)
         train = (train_norm, train[1])
-        valid_norm = valid[0] / 255.
+        valid_norm = valid[0] / float(255)
         valid = (valid_norm, valid[1])
-        test_norm = test[0] / 255.
+        test_norm = test[0] / float(255)
         test = (test_norm, test[1])
 
     if preprocess_type is None:
         return train, valid, test
 
     # whiten, LCN, GCN, Local Mean Subtract, or normalize
-    print("Preprocessing train set with ", preprocess_type, " ", patch_size)
-    train_pre = []
-    for x in train[0]:
-        img = np.expand_dims(x, axis=0)
-        x_pre = preprocess(img, preprocess_type,
-                           patch_size,
-                           max_patches)
-        train_pre.append(x_pre[0])
-    train = (np.array(train_pre), np.array(train[1]))
+    if len(train[0]) > 0:
+        train_pre = []
+        print ""
+        print "Preprocessing {} images of the train set with {} {} ".format(
+            len(train[0]), preprocess_type, patch_size),
+        print ""
+        i = 0
+        print "Progress: {0:.3g} %".format(i * 100 / len(train[0])),
+        for i, x in enumerate(train[0]):
+            img = np.expand_dims(x, axis=0)
+            x_pre = preprocess(img, preprocess_type,
+                               patch_size,
+                               max_patches)
+            train_pre.append(x_pre[0])
+            print "\rProgress: {0:.3g} %".format(i * 100 / len(train[0])),
+            sys.stdout.flush()
 
-    print("Preprocessing valid set with ", preprocess_type, " ", patch_size)
-    valid_pre = []
-    for x in valid[0]:
-        img = np.expand_dims(x, axis=0)
-        x_pre = preprocess(img, preprocess_type,
-                           patch_size,
-                           max_patches)
-        valid_pre.append(x_pre[0])
-    valid = (np.array(valid_pre), np.array(valid[1]))
+        train = (np.array(train_pre), np.array(train[1]))
 
-    print("Preprocessing test set with ", preprocess_type, " ", patch_size)
-    test_pre = []
-    for x in test[0]:
-        img = np.expand_dims(x, axis=0)
-        x_pre = preprocess(img, preprocess_type,
-                           patch_size,
-                           max_patches)
-        test_pre.append(x_pre[0])
-    test = (np.array(test_pre), np.array(test[1]))
+    if len(valid[0]) > 0:
+        valid_pre = []
+        print ""
+        print "Preprocessing {} images of the valid set with {} {} ".format(
+            len(valid[0]), preprocess_type, patch_size),
+        print ""
+        i = 0
+        print "Progress: {0:.3g} %".format(i * 100 / len(valid[0])),
+        for i, x in enumerate(valid[0]):
+            img = np.expand_dims(x, axis=0)
+            x_pre = preprocess(img, preprocess_type,
+                               patch_size,
+                               max_patches)
+            valid_pre.append(x_pre[0])
+            print "\rProgress: {0:.3g} %".format(i * 100 / len(valid[0])),
+            sys.stdout.flush()
+
+        valid = (np.array(valid_pre), np.array(valid[1]))
+
+    if len(test[0]) > 0:
+        test_pre = []
+        print ""
+        print "Preprocessing {} images of the test set with {} {} ".format(
+            len(test[0]), preprocess_type, patch_size),
+        print ""
+        i = 0
+        print "Progress: {0:.3g} %".format(i * 100 / len(test[0])),
+        for i, x in enumerate(test[0]):
+            img = np.expand_dims(x, axis=0)
+            x_pre = preprocess(img, preprocess_type,
+                               patch_size,
+                               max_patches)
+            test_pre.append(x_pre[0])
+            print "\rProgress: {0:.3g} %".format(i * 100 / len(test[0])),
+            sys.stdout.flush()
+        test = (np.array(test_pre), np.array(test[1]))
 
     return train, valid, test
 
@@ -366,7 +391,7 @@ def gaussian_filter(kernel_shape):
 
     mid = floor(kernel_shape/ 2.)
     for i in xrange(0,kernel_shape):
-        for j in xrange(0, kernel_shape):
+        for j in xrange(0,kernel_shape):
             x[i, j] = gauss(i-mid, j-mid)
 
     return x / sum(x)
@@ -413,12 +438,13 @@ def convolutional_zca(input, patch_size=(9, 9), max_patches=int(1e5)):
 
     :return: conv-zca whitened dataset
     """
-    patch_size = (patch_size, patch_size)
+
     # I don't know if it's correct or not.. but it seems to work
     mean = np.mean(input, axis=(0, 1, 2))
     input -= mean  # center the data
 
     n_imgs, h, w, n_channels = input.shape
+    patch_size = (patch_size, patch_size)
     patches = PatchExtractor(patch_size=patch_size,
                              max_patches=max_patches).transform(input)
     pca = PCA()
@@ -456,9 +482,7 @@ def convolutional_zca(input, patch_size=(9, 9), max_patches=int(1e5)):
                             kernel,
                             input_shape=image_shape,
                             filter_shape=filter_shape,
-                            border_mode='full'
-                            )
-
+                            border_mode='full')
     s_crop = [(patch_size[0] - 1) // 2,
               (patch_size[1] - 1) // 2]
     # e_crop = [s_crop[0] if (s_crop[0] % 2) != 0 else s_crop[0] + 1,
