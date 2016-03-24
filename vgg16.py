@@ -101,18 +101,21 @@ class Vgg16Layer(lasagne.layers.Layer):
         if 'concat' in get_layer:
             n_pool = get_layer[6:]
             get_layer = 'pool' + str(n_pool)
-            l_conv = net['input']
+            l_conv = net['conv1_1']
             for i in range(int(n_pool)):
-                n_filters = net['conv' + str(i+1) + '_1'].num_filters
-                l_conv = ConvLayer(
-                    l_conv, n_filters, 2, pad=0, stride=2, flip_filters=True,
+                l_conv = net['conv' + str(i+1) + '_1']
+                l_pool = net['pool' + str(i+1)]
+
+                l_new = ConvLayer(
+                    l_conv, l_conv.num_filters, 2, pad=0, stride=2,
+                    flip_filters=True,
                     name='vgg16_skipconnection_conv_' + str(i+1))
-                self.concat_sublayers.append(l_conv)
-            l_out = ConcatLayer(
-                (l_conv, net[get_layer]), axis=1,
-                name='vgg16_skipconnection_concat')
-            self.concat_sublayers.append(l_out)
-            out_layer = l_out
+                self.concat_sublayers.append(l_new)
+                l_concat = ConcatLayer(
+                    (l_pool, l_new), axis=1,
+                    name='vgg16_skipconnection_concat_' + str(i))
+                self.concat_sublayers.append(l_concat)
+            out_layer = l_concat
         else:
             out_layer = net[get_layer]
 
@@ -184,7 +187,7 @@ class Vgg16Layer(lasagne.layers.Layer):
         # iterate through the parallel network if any
         for layer in self.concat_sublayers:
             if isinstance(layer, ConcatLayer):
-                c_input_shape = (c_input_shape, input_shape)
+                c_input_shape = (c_input_shape, c_input_shape)
             output_shape = layer.get_output_shape_for(c_input_shape)
             c_input_shape = output_shape
         return output_shape
