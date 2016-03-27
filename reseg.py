@@ -1090,53 +1090,354 @@ def show_seg(dataset_name, n_exp, dataset_set, mode='sequential', id=-1):
     load_from_file = True
     # load options
     model_filename = 'model_recseg_' + dataset_name + n_exp + ".npz"
-    options = pkl.load(open(
-            os.path.expanduser(
-                    os.path.join(dataset_name + "_models",
-                                 model_filename + '.pkl')), 'rb'))
+    try:
+        options = pkl.load(open(
+                os.path.expanduser(
+                        os.path.join(dataset_name + "_models",
+                                     model_filename + '.pkl')), 'rb'))
+        saveto = options['saveto'][1]
+    except IOError:
+        pass
 
-    # now go in the default directory to retrieve all the prediction masks
-    name = options['dataset']
+    try:
+        options = pkl.load(open(
+                os.path.expanduser(
+                        os.path.join("tmp",
+                                     model_filename + '.pkl')), 'rb'))
+        saveto = options['saveto'][0]
+    except IOError:
+        pass
 
+    if len(options) == 0:
+        print "Error file not found"
+        exit()
+
+    n_save = options['n_save']
+    n_save = -1
+    # Input Conv layers
+    in_nfilters = options['in_nfilters']
+    in_filters_size = options['in_filters_size']
+    in_filters_stride = options['in_filters_stride']
+    in_W_init = options['in_W_init']
+    in_b_init = options['in_b_init']
+    in_nonlinearity = options['in_nonlinearity']
+    load_pretrain_weights_until = options['load_pretrain_weights_until']
+    learn_from_layer = options['learn_from_layer']
+
+    # RNNs layers
+    dim_proj = options['dim_proj']
+    pwidth = options['pwidth']
+    pheight = options['pheight']
+    stack_sublayers = options['stack_sublayers']
+    RecurrentNet = options['RecurrentNet']
+    nonlinearity = options['nonlinearity']
+    hid_init = options['hid_init']
+    grad_clipping = options['grad_clipping']
+    precompute_input = options['precompute_input']
+    mask_input = options['mask_input']
+
+    # 1x1 Conv layer for dimensional reduction
+    conv_dim_red = options['conv_dim_red']
+    conv_dim_red_nonlinearity = options['conv_dim_red_nonlinearity']
+
+    # GRU specific params
+    gru_resetgate = options['gru_resetgate']
+    gru_updategate = options['gru_updategate']
+    gru_hidden_update = options['gru_hidden_update']
+    gru_hid_init = options['gru_hid_init']
+
+    # LSTM specific params
+    lstm_ingate = options['lstm_ingate']
+    lstm_forgetgate = options['lstm_forgetgate']
+    lstm_cell = options['lstm_cell']
+    lstm_outgate = options['lstm_outgate']
+
+    # RNN specific params
+    rnn_W_in_to_hid = options['rnn_W_in_to_hid']
+    rnn_W_hid_to_hid = options['rnn_W_hid_to_hid']
+    rnn_b = options['rnn_b']
+
+    # Output upsampling layers
+    out_upsampling = options['out_upsampling']
+    out_nfilters = options['out_nfilters']
+    out_filters_size = options['out_filters_size']
+    out_filters_stride = options['out_filters_stride']
+    out_W_init = options['out_W_init']
+    out_b_init = options['out_b_init']
+    out_nonlinearity = options['out_nonlinearity']
+
+    # Prediction, Softmax
+    intermediate_pred = options['intermediate_pred']
+    class_balance = options['class_balance']
+
+    # Special layers
+    batch_norm = options['batch_norm']
+    use_dropout = options['use_dropout']
+    dropout_rate = options['dropout_rate']
+    use_dropout_x = options['use_dropout_x']
+    dropout_x_rate = options['dropout_x_rate']
+
+    # Optimization method
+    optimizer = options['optimizer']
+    learning_rate = options['learning_rate']
+    momentum = options['momentum']
+    rho = options['rho']
+    beta1 = options['beta1']
+    beta2 = options['beta2']
+    epsilon = options['epsilon']
+    weight_decay = options['weight_decay']
+    weight_noise = options['weight_noise']
+
+    # Batch params
+    batch_size = options['batch_size']
+    valid_batch_size = options['valid_batch_size']
+    shuffle = options['shuffle']
+
+    # Dataset
+    dataset = options['dataset']
+    color_space = options['color_space']
+    color = options['color']
+    use_depth = options['use_depth']
+    resize_images = options['resize_images']
+    resize_size = options['resize_size']
+
+    # Pre-processing
+    preprocess_type = options['preprocess_type']
+    patch_size = options['patch_size']
+    max_patches = options['max_patches']
+
+    # Data augmentation
+    do_random_flip = options['do_random_flip']
+    do_random_shift = options['do_random_shift']
+    do_random_invert_color = options['do_random_invert_color']
+    shift_pixels = options['shift_pixels']
+
+    # Save state from options
+    rng = options['rng']
+    # trng = options['trng'] --> to be reloaded after building the model
+    history_acc = options['history_acc'].tolist()
+    history_conf_matrix = options['history_conf_matrix'].tolist()
+    history_iou_index = options['history_iou_index'].tolist()
+    print_params(options)
+
+    n_layers = len(dim_proj)
+
+    assert class_balance in [None, 'median_freq_cost', 'natural_freq_cost',
+                             'priors_correction'], (
+        'The balance class method is not implemented')
+    assert (preprocess_type in [None, 'f-whiten', 'conv-zca', 'sub-lcn',
+                                'subdiv-lcn', 'gcn', 'local_mean_sub']), (
+            "The preprocessing method choosen is not implemented")
+
+    # Load data
+    # ---------
     print("Loading data ...")
-    load_data, properties = get_dataset(options['dataset'])
+    load_data, properties = get_dataset(dataset)
     train, valid, test, mean, std, filenames, fullmasks = load_data(
-        resize_images=options['resize_images'],
-        resize_size=options['resize_size'],
-        color=options['color'],
-        color_space=options['color_space'],
-        rng=options['rng'],
-        use_depth=options['use_depth'],
+        resize_images=resize_images,
+        resize_size=resize_size,
+        color=color,
+        color_space=color_space,
+        rng=rng,
+        use_depth=use_depth,
         with_filenames=True,
         with_fullmasks=True)
+    has_void_class = properties()['has_void_class']
 
-    if load_from_file:
-        seg_path = os.path.abspath(
-                os.path.join('segmentations', name,
-                             model_filename.split('/')[-1][:-4]))
+    if not color:
+        if mean.ndim == 3:
+            mean = np.expand_dims(mean, axis=3)
+        if std.ndim == 3:
+            std = np.expand_dims(std, axis=3)
+
+    # Preprocess each image separately usually with LCN in order not to lose
+    # time at each epoch
+
+    # Default: input is float btw 0 and 1
+    # If we use vgg convnet the input should be 0:255
+    input_to_float = False if type(in_nfilters) == str else True
+    train, valid, test = preprocess_dataset(train, valid, test,
+                                            input_to_float,
+                                            preprocess_type,
+                                            patch_size, max_patches)
+
+    # Compute the indexes of the images to be saved
+    if isinstance(n_save, collections.Iterable):
+        samples_ids = np.array(n_save)
+    elif n_save != -1:
+        samples_ids = [
+            random.sample(range(len(s)), min(len(s), n_save)) for s in
+            [train[0], valid[0], test[0]]]
+    else:
+        samples_ids = [range(len(s)) for s in [train[0], valid[0], test[0]]]
+    options['samples_ids'] = samples_ids
+
+    # Retrieve basic size informations and split train variables
+    x_train, y_train = train
+    if len(x_train) == 0:
+        raise RuntimeError("Dataset not found")
+    filenames_train, filenames_valid, filenames_test = filenames
+    cheight, cwidth, cchannels = x_train[0].shape
+    nclasses = max([np.max(el) for el in y_train]) + 1
+    print '# of classes:', nclasses
+
+    # Remove the segmentation samples dir to make sure we don't mix samples
+    # from different experiments
+    seg_path = os.path.join('segmentations', dataset,
+                            saveto.split('/')[-1][:-4])
+
+    # Class balancing
+    # ---------------
+    # TODO: check if it works...
+    w_freq = 1
+    if class_balance in ['median_freq_cost', 'rare_freq_cost']:
+        u_train, c_train = np.unique(y_train, return_counts=True)
+        priors = c_train.astype(theano.config.floatX) / train[1].size
+
+        # the denominator is computed by summing the total number
+        # of pixels of the images where the class is present
+        # so it should be even more balanced
+        px_count = np.zeros(u_train.shape)
+        for tt in y_train:
+            u_tt = np.unique(tt)
+            px_t = tt.size
+            for uu in u_tt:
+                px_count[uu] += px_t
+        priors = c_train.astype(theano.config.floatX) / px_count
+
+        if class_balance == 'median_freq_cost':
+            w_freq = np.median(priors) / priors
+            # we don't want to give more importance to the void class
+            if has_void_class:
+                w_freq[-1] = 0
+        elif class_balance == 'rare_freq_cost':
+            w_freq = 1 / (nclasses * priors)
+
+        print "Class balance weights", w_freq
+
+        assert len(priors) == nclasses, ("Number of computed priors are "
+                                         "different from number of classes")
+
+    try:
+        rmtree(seg_path)
+    except OSError:
+        pass
 
     if dataset_set == 'train':
-        id_f = 0
-        images = train[0]
-        gt = train[1]
+        data = train
+        samples_ids = samples_ids[0]
     elif dataset_set == 'valid':
-        id_f = 1
-        images = valid[0]
-        gt = valid[1]
+        data = valid
+        samples_ids = samples_ids[1]
     else:
-        id_f = 2
-        images = test[0]
-        gt = test[1]
+        data = test
+        samples_ids = samples_ids[2]
 
-    # TODO: use buildReSeg()
-    out_layer = [id_f, images, gt, seg_path]  # DELETEME!
+    input_shape = (None, cheight, cwidth, cchannels)
+    input_var = T.tensor4('inputs')
 
-    # load params
-    with np.load('model.npz') as f:
+    l_out = buildReSeg(input_shape, input_var,
+                       n_layers, pheight, pwidth,
+                       dim_proj, nclasses, stack_sublayers,
+                       # upsampling
+                       out_upsampling,
+                       out_nfilters,
+                       out_filters_size,
+                       out_filters_stride,
+                       out_W_init=out_W_init,
+                       out_b_init=out_b_init,
+                       out_nonlinearity=out_nonlinearity,
+                       # input ConvLayers
+                       in_nfilters=in_nfilters,
+                       in_filters_size=in_filters_size,
+                       in_filters_stride=in_filters_stride,
+                       in_W_init=in_W_init,
+                       in_b_init=in_b_init,
+                       in_nonlinearity=in_nonlinearity,
+                       load_pretrain_weights_until=load_pretrain_weights_until,
+                       learn_from_layer=learn_from_layer,
+                       # common recurrent layer params
+                       RecurrentNet=RecurrentNet,
+                       nonlinearity=nonlinearity,
+                       hid_init=hid_init,
+                       grad_clipping=grad_clipping,
+                       precompute_input=precompute_input,
+                       mask_input=mask_input,
+                       # 1x1 Conv layer for dimensional reduction
+                       conv_dim_red=conv_dim_red,
+                       conv_dim_red_nonlinearity=conv_dim_red_nonlinearity,
+                       # GRU specific params
+                       gru_resetgate=gru_resetgate,
+                       gru_updategate=gru_updategate,
+                       gru_hidden_update=gru_hidden_update,
+                       gru_hid_init=gru_hid_init,
+                       # LSTM specific params
+                       lstm_ingate=lstm_ingate,
+                       lstm_forgetgate=lstm_forgetgate,
+                       lstm_cell=lstm_cell,
+                       lstm_outgate=lstm_outgate,
+                       # RNN specific params
+                       rnn_W_in_to_hid=rnn_W_in_to_hid,
+                       rnn_W_hid_to_hid=rnn_W_hid_to_hid,
+                       rnn_b=rnn_b,
+                       # special layers
+                       batch_norm=batch_norm)
+
+    # load best params
+    print("Loading parameter best model ...")
+    with np.load(saveto) as f:
         bestparams_val = [f['arr_%d' % i] for i in range(len(f.files))]
-    lasagne.layers.set_all_param_values(out_layer, bestparams_val)
+    lasagne.layers.set_all_param_values(l_out, bestparams_val[1])
+
+    input_shape = input_var.shape
+    # Compute BN params for prediction
+    batch_norm_params = dict()
+    if batch_norm:
+        batch_norm_params.update(
+            dict(batch_norm_update_averages=False))
+        batch_norm_params.update(
+            dict(batch_norm_use_averages=True))
+
+    print("Building model ...")
+    # Model compilation
+    # -----------------
+    # computes the deterministic distribution over the labels, i.e. we
+    # disable the stochastic layers such as Dropout
+    prediction = lasagne.layers.get_output(l_out, deterministic=True,
+                                           **batch_norm_params)
+    f_pred = theano.function(
+        [input_var],
+        T.argmax(prediction, axis=1).reshape(
+            (-1, input_shape[1], input_shape[2])))
 
     # compute prediction on the dataset or on the image that we specified
+    (test_global_acc,
+     test_conf_matrix,
+     test_mean_class_acc,
+     test_iou_index,
+     test_mean_iou_index) = validate(f_pred,
+                                     data,
+                                     valid_batch_size,
+                                     has_void_class,
+                                     preprocess_type,
+                                     nclasses,
+                                     samples_ids=samples_ids,
+                                     filenames=filenames_test,
+                                     folder_dataset=dataset_set,
+                                     dataset=dataset,
+                                     saveto=saveto[0])
+
+    print("")
+    print("Global Accuracies :")
+    print('Test ', test_global_acc)
+    print("")
+    print("Class Accuracies :")
+    print('Test ', test_mean_class_acc)
+    print("")
+    print("Mean Intersection Over Union :")
+    print('Test ', test_mean_iou_index)
+    print("")
+
 
 if __name__ == '__main__':
 
