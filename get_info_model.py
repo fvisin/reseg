@@ -49,10 +49,10 @@ def print_params(fp, print_commit_hash=False, plot=False,
         errs = fp.get('history_errs', None)
     conf_matrices = numpy.array(fp['history_conf_matrix'])
     iou_indeces = numpy.array(fp['history_iou_index'])
-    nclasses = conf_matrices.shape[2] if len(conf_matrices) > 0 else -1
+    #nclasses = conf_matrices.shape[2] if len(conf_matrices) > 0 else -1
     # hack for nyu because now I don't have the time to think to something else
-    if dataset == 'nyu_depth':
-        dataset = 'nyu_depth40' if nclasses == 41 else 'nyu_depth04'
+    # if dataset == 'nyu_depth':
+    #     dataset = 'nyu_depth40' if nclasses == 41 else 'nyu_depth04'
     headers = headers_datasets.get(dataset, None)
     if headers is None:
         headers = [str(i) for i in range(0, fp['out_nfilters'][-1])]
@@ -253,7 +253,7 @@ def print_params(fp, print_commit_hash=False, plot=False,
         plt.plot(plt_range, 1 - errs[:, 7], label='test')
         plt.grid(True)
         plt.ylim(-0.001, 1.1)
-        plt.ylabel('Mean Pixels error %')
+        plt.ylabel('Avg Class error %')
         plt.legend(loc='best', fancybox=True, framealpha=0.1)
 
         # Plot Mean IoU error %
@@ -264,7 +264,7 @@ def print_params(fp, print_commit_hash=False, plot=False,
         plt.plot(plt_range, 1 - errs[:, 8], label='test')
         plt.grid(True)
         plt.ylim(-0.001, 1.1)
-        plt.ylabel('Mean IoU error %')
+        plt.ylabel('Avg IoU error %')
         plt.legend(loc='best', fancybox=True, framealpha=0.1)
 
         if huc is not None:
