@@ -24,11 +24,14 @@ def print_pkl_params(pkl_path, *args):
     except IOError:
         print "Couldn't load " + pkl_path
         return 0
-    return print_params(options, *args)
+    save_plot_path = pkl_path.replace('models', 'plots').replace('.npz.pkl',
+                                                                 '.pdf')
+    return print_params(options, save_plot_path, *args)
 
 
-def print_params(fp, print_commit_hash=False, plot=False,
-                 print_history=False, print_best_class_accuracy=False):
+def print_params(fp, save_plot_path='', print_commit_hash=False, plot=False,
+                 print_history=False, print_best_class_accuracy=False,
+                 ):
     """Prints the parameter of the model
 
     Parameters
@@ -61,9 +64,12 @@ def print_params(fp, print_commit_hash=False, plot=False,
     if len(errs):
         min_valid = numpy.argmax(errs[:, 3])
         best = errs[min_valid]
-        best_test_class_acc = numpy.round(
-            numpy.diagonal(conf_matrices[min_valid][2]) /
-            conf_matrices[min_valid][2].sum(axis=1), 3)
+        if len(conf_matrices[min_valid][2]) == 0:
+            best_test_class_acc = []
+        else:
+            best_test_class_acc = numpy.round(
+                numpy.diagonal(conf_matrices[min_valid][2]) /
+                conf_matrices[min_valid][2].sum(axis=1), 3)
 
         if len(best_test_class_acc) > 0 and print_best_class_accuracy:
             best_per_class_accuracy = "|".join(
@@ -243,7 +249,7 @@ def print_params(fp, print_commit_hash=False, plot=False,
         plt.grid(True)
         plt.ylim(-0.001, 1.1)
         plt.ylabel('Global Pixels error %')
-        plt.legend(loc='best', fancybox=True, framealpha=0.1)
+        plt.legend(loc=1, fancybox=True, framealpha=0.1, fontsize='small')
 
         # plot Mean Pixels error %
         plt.subplot(3, 1, 2)
@@ -254,7 +260,7 @@ def print_params(fp, print_commit_hash=False, plot=False,
         plt.grid(True)
         plt.ylim(-0.001, 1.1)
         plt.ylabel('Avg Class error %')
-        plt.legend(loc='best', fancybox=True, framealpha=0.1)
+        plt.legend(loc=1, fancybox=True, framealpha=0.1, fontsize='small')
 
         # Plot Mean IoU error %
         plt.subplot(3, 1, 3)
@@ -265,7 +271,7 @@ def print_params(fp, print_commit_hash=False, plot=False,
         plt.grid(True)
         plt.ylim(-0.001, 1.1)
         plt.ylabel('Avg IoU error %')
-        plt.legend(loc='best', fancybox=True, framealpha=0.1)
+        plt.legend(loc=1, fancybox=True, framealpha=0.1, fontsize='small')
 
         if huc is not None:
             plt.subplot(2, 1, 2)
@@ -274,7 +280,8 @@ def print_params(fp, print_commit_hash=False, plot=False,
             plt.plot(huc_range, huc)
             plt.ylabel('Training cost')
             plt.grid(True)
-        plt.show()
+        # plt.show()
+        plt.savefig(save_plot_path, format="pdf")
     if print_history:
         for i, (e, c, iou) in enumerate(zip(errs, conf_matrices, iou_indeces)):
 
