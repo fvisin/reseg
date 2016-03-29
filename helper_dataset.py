@@ -176,13 +176,6 @@ def preprocess_dataset(train, valid, test,
         valid = (valid_norm, valid[1])
         test_norm = test[0].astype(floatX) / 255.
         test = (test_norm, test[1])
-    else:
-        train_norm = train[0].astype(floatX)
-        train = (train_norm, train[1])
-        valid_norm = valid[0].astype(floatX)
-        valid = (valid_norm, valid[1])
-        test_norm = test[0].astype(floatX)
-        test = (test_norm, test[1])
 
     if preprocess_type is None:
         return train, valid, test
@@ -287,7 +280,7 @@ def preprocess(x, mode=None,
         for d in range(x.shape[-1]):
             x[:, :, :, d] = local_mean_subtraction(x[:, :, :, d],
                                                    kernel_size=patch_size)
-    x = x.astype(floatX)
+    # x = x.astype(floatX)
     return x
 
 
