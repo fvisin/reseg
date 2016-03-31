@@ -298,7 +298,7 @@ def load_data(
     compute_stats='all',
     rng=None,
     with_fullmasks=False,
-    cityscape_train=True,
+    cityscape_train=False,
     **kwargs
 ):
     """Dataset loader
