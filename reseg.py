@@ -988,18 +988,19 @@ def train(saveto='model.npz',
                 options['history_conf_matrix'] = np.array(history_conf_matrix)
                 options['history_iou_index'] = np.array(history_iou_index)
 
-                return valid_global_acc, test_global_acc
+                return valid_mean_iou_index, test_mean_iou_index
 
             # Check predictions' accuracy
             if np.mod(uidx, validFreq) == 0:
 
                 if valid_wait == 0:
-                    valid_global_acc, test_global_acc = validate_model()
+                    (valid_mean_iou_index,
+                     test_mean_iou_index) = validate_model()
 
-                    # Did we improve *validation* accuracy?
+                    # Did we improve *validation* mean IOU accuracy?
                     if (len(valid) > 0 and
-                        (len(history_acc) == 0 or valid_global_acc >= np.array(
-                            history_acc)[:, 3].max())):
+                            (len(history_acc) == 0 or valid_mean_iou_index >=
+                             np.array(history_acc)[:, 5].max())):
 
                         # TODO check if CUDA variables!
                         bestparams = lasagne.layers.get_all_param_values(l_out)
@@ -1008,8 +1009,8 @@ def train(saveto='model.npz',
                     else:
                         # if validation set is empty check test
                         # set to save params
-                        if len(history_acc) == 0 or test_global_acc >= np.array(
-                                history_acc)[:, 6].max():
+                        if len(history_acc) == 0 or test_mean_iou_index >= \
+                                np.array(history_acc)[:, 8].max():
                             # TODO check if CUDA variables!
                             bestparams = lasagne.layers.get_all_param_values(
                                 l_out)
