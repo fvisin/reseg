@@ -879,7 +879,7 @@ def train(saveto='model.npz',
                 class_balance_w = w_freq[targets_flat].astype(floatX)
 
             # Compute cost
-            cost = f_train(inputs, targets_flat, class_balance_w)
+            cost = f_train(inputs.astype(floatX), targets_flat, class_balance_w)
             ud = time.time() - st
 
             if np.isnan(cost):
