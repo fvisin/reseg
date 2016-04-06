@@ -62,11 +62,21 @@ def print_params(fp, save_plot_path='', print_commit_hash=False, plot=False,
 
     # they're already accuracies
     if len(errs):
-        min_valid = numpy.argmax(errs[:, 3])
+
+        G_valid_idx = 3
+        C_valid_idx = 4
+        iou_valid_idx = 5
+
+        min_valid = numpy.argmax(errs[:, iou_valid_idx])
         best = errs[min_valid]
-        if len(conf_matrices[min_valid][2]) == 0:
-            best_test_class_acc = []
+
+        if 'cityscapes' in dataset:
+            # for cityscapes we need to print the best iou index of the
+            # validation set (we don't have the test)
+            best_test_class_acc = numpy.round(iou_indeces[min_valid][1], 3)
         else:
+            # in general we need to print the best accuracies of the test
+            # given by the best validation model
             best_test_class_acc = numpy.round(
                 numpy.diagonal(conf_matrices[min_valid][2]) /
                 conf_matrices[min_valid][2].sum(axis=1), 3)
@@ -81,8 +91,17 @@ def print_params(fp, save_plot_path='', print_commit_hash=False, plot=False,
         if len(best) == 2:
             error = (" ", round(best[0], 3), round(best[3], 3))
         else:
-            error = (round(best[0], 3), round(best[3], 3),
-                     round(best[6], 3), round(best[7], 3), round(best[8], 3))
+
+            if 'cityscapes' in dataset:
+                # print the validation errors
+                error = (round(best[0], 3), round(best[3], 3),
+                         round(best[6], 3), round(best[4], 3),
+                         round(best[5], 3))
+            else:
+                # print the test errors
+                error = (round(best[0], 3), round(best[3], 3),
+                         round(best[6], 3), round(best[7], 3),
+                         round(best[8], 3))
     else:
         error = [' ', ' ', ' ', ' ', ' ']
         best_per_class_accuracy = ''
