@@ -1168,31 +1168,12 @@ def show_seg(dataset_name, n_exp, dataset_set, mode='sequential', id=-1):
     out_nonlinearity = options['out_nonlinearity']
 
     # Prediction, Softmax
-    intermediate_pred = options['intermediate_pred']
     class_balance = options['class_balance']
 
     # Special layers
     batch_norm = options['batch_norm']
-    use_dropout = options['use_dropout']
-    dropout_rate = options['dropout_rate']
-    use_dropout_x = options['use_dropout_x']
-    dropout_x_rate = options['dropout_x_rate']
 
-    # Optimization method
-    optimizer = options['optimizer']
-    learning_rate = options['learning_rate']
-    momentum = options['momentum']
-    rho = options['rho']
-    beta1 = options['beta1']
-    beta2 = options['beta2']
-    epsilon = options['epsilon']
-    weight_decay = options['weight_decay']
-    weight_noise = options['weight_noise']
-
-    # Batch params
-    batch_size = options['batch_size']
     valid_batch_size = options['valid_batch_size']
-    shuffle = options['shuffle']
 
     # Dataset
     dataset = options['dataset']
@@ -1207,18 +1188,9 @@ def show_seg(dataset_name, n_exp, dataset_set, mode='sequential', id=-1):
     patch_size = options['patch_size']
     max_patches = options['max_patches']
 
-    # Data augmentation
-    do_random_flip = options['do_random_flip']
-    do_random_shift = options['do_random_shift']
-    do_random_invert_color = options['do_random_invert_color']
-    shift_pixels = options['shift_pixels']
-
     # Save state from options
     rng = options['rng']
     # trng = options['trng'] --> to be reloaded after building the model
-    history_acc = options['history_acc'].tolist()
-    history_conf_matrix = options['history_conf_matrix'].tolist()
-    history_iou_index = options['history_iou_index'].tolist()
     print_params(options)
 
     n_layers = len(dim_proj)
@@ -1327,12 +1299,15 @@ def show_seg(dataset_name, n_exp, dataset_set, mode='sequential', id=-1):
     if dataset_set == 'train':
         data = train
         samples_ids = samples_ids[0]
+        filenames = filenames_train
     elif dataset_set == 'valid':
         data = valid
         samples_ids = samples_ids[1]
+        filenames = filenames_valid
     else:
         data = test
         samples_ids = samples_ids[2]
+        filenames = filenames_test
 
     input_shape = (None, cheight, cwidth, cchannels)
     input_var = T.tensor4('inputs')
@@ -1355,8 +1330,6 @@ def show_seg(dataset_name, n_exp, dataset_set, mode='sequential', id=-1):
                        in_W_init=in_W_init,
                        in_b_init=in_b_init,
                        in_nonlinearity=in_nonlinearity,
-                       load_pretrain_weights_until=load_pretrain_weights_until,
-                       learn_from_layer=learn_from_layer,
                        # common recurrent layer params
                        RecurrentNet=RecurrentNet,
                        nonlinearity=nonlinearity,
@@ -1423,7 +1396,7 @@ def show_seg(dataset_name, n_exp, dataset_set, mode='sequential', id=-1):
                                      preprocess_type,
                                      nclasses,
                                      samples_ids=samples_ids,
-                                     filenames=filenames_test,
+                                     filenames=filenames,
                                      folder_dataset=dataset_set,
                                      dataset=dataset,
                                      saveto=saveto[0])
