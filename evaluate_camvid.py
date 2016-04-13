@@ -118,7 +118,7 @@ if __name__ == '__main__':
     dataset = 'camvid'
     path = dataset + '_models/model_recseg' + __file__[8:-3] + '.npz'
     main(1, {
-        'saveto':path,
+        'saveto': path,
         'tmp-saveto':  'tmp/' + path,
 
         # Note: with linear_conv you cannot select every filter size.
@@ -156,16 +156,16 @@ if __name__ == '__main__':
         'gru-resetgate': lasagne.layers.Gate(W_cell=None),
         'gru-updategate': lasagne.layers.Gate(W_cell=None),
         'gru-hidden-update': lasagne.layers.Gate(
-          W_cell=None,
-          nonlinearity=lasagne.nonlinearities.tanh),
+            W_cell=None,
+            nonlinearity=lasagne.nonlinearities.tanh),
         'gru-hid-init': lasagne.init.Constant(0.),
 
         # LSTM specific params
         'lstm-ingate': lasagne.layers.Gate(),
         'lstm-forgetgate': lasagne.layers.Gate(),
         'lstm-cell': lasagne.layers.Gate(
-          W_cell=None,
-          nonlinearity=lasagne.nonlinearities.tanh),
+            W_cell=None,
+            nonlinearity=lasagne.nonlinearities.tanh),
         'lstm-outgate': lasagne.layers.Gate(),
 
         # RNN specific params
@@ -174,10 +174,10 @@ if __name__ == '__main__':
         'rnn-b': lasagne.init.Constant(0.),
 
         # Output upsampling layers
-        'out-upsampling': 'linear',
-        'out-nfilters': None,  # The last number should be the num of classes
-        'out-filters-size': (1, 1),
-        'out-filters-stride': None,
+        'out-upsampling': 'grad',
+        'out-nfilters': [100, 100],
+        'out-filters-size': [(2, 2), (1, 1)],
+        'out-filters-stride': [(2, 2), (1, 1)],
         'out-W-init': lasagne.init.GlorotUniform(),
         'out-b-init': lasagne.init.Constant(0.),
         'out-nonlinearity': lasagne.nonlinearities.rectify,
