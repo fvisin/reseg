@@ -176,7 +176,7 @@ def buildReSeg(input_shape, input_var,
     l_out = CropLayer(l_reseg, crop, centered=False)
 
     # channel = nclasses
-    if out_upsampling is not 'linear':
+    if 'linear' not in out_upsampling:
         l_out = lasagne.layers.Conv2DLayer(
             l_out,
             num_filters=nclasses,
@@ -1122,8 +1122,6 @@ def show_seg(dataset_name, n_exp, dataset_set, mode='sequential', id=-1):
     in_W_init = options['in_W_init']
     in_b_init = options['in_b_init']
     in_nonlinearity = options['in_nonlinearity']
-    load_pretrain_weights_until = options['load_pretrain_weights_until']
-    learn_from_layer = options['learn_from_layer']
 
     # RNNs layers
     dim_proj = options['dim_proj']
@@ -1138,8 +1136,8 @@ def show_seg(dataset_name, n_exp, dataset_set, mode='sequential', id=-1):
     mask_input = options['mask_input']
 
     # 1x1 Conv layer for dimensional reduction
-    conv_dim_red = options['conv_dim_red']
-    conv_dim_red_nonlinearity = options['conv_dim_red_nonlinearity']
+    conv_dim_red = options.get('conv_dim_red', None)
+    conv_dim_red_nonlinearity = options.get('conv_dim_red_nonlinearity', None)
 
     # GRU specific params
     gru_resetgate = options['gru_resetgate']
@@ -1179,7 +1177,7 @@ def show_seg(dataset_name, n_exp, dataset_set, mode='sequential', id=-1):
     dataset = options['dataset']
     color_space = options['color_space']
     color = options['color']
-    use_depth = options['use_depth']
+    use_depth = options.get('use_depth', None)
     resize_images = options['resize_images']
     resize_size = options['resize_size']
 
