@@ -884,7 +884,8 @@ def train(saveto='model.npz',
                 class_balance_w = w_freq[targets_flat].astype(floatX)
 
             # Compute cost
-            cost = f_train(inputs.astype(floatX), targets_flat, class_balance_w)
+            cost = f_train(inputs.astype(floatX), targets_flat,
+                           class_balance_w)
             ud = time.time() - st
 
             if np.isnan(cost):
@@ -1006,17 +1007,6 @@ def train(saveto='model.npz',
                         bestparams = lasagne.layers.get_all_param_values(l_out)
                         patience_counter = 0
                         save = True  # Save model params
-                    else:
-                        # if validation set is empty check test
-                        # set to save params
-                        if len(history_acc) == 0 or test_mean_iou_index >= \
-                                np.array(history_acc)[:, 8].max():
-                            # TODO check if CUDA variables!
-                            bestparams = lasagne.layers.get_all_param_values(
-                                l_out)
-                            patience_counter = 0
-                            # Save model params
-                            save = True
 
                     # Early stop if patience is over
                     if (eidx > min_epochs):
@@ -1054,14 +1044,33 @@ def train(saveto='model.npz',
             eidx + 1, max_epochs, time.time() - start_time, epoch_cost))
 
     pbar.finish()
-    validate_model()
-    max_valid_idx = np.argmax(np.array(history_acc)[:, 3])
+    max_valid_idx = np.argmax(np.array(history_acc)[:, 5])
     best = history_acc[max_valid_idx]
-    print("Global Accuracies :")
+    (train_global_acc,
+     train_mean_class_acc,
+     train_mean_iou_index,
+     valid_global_acc,
+     valid_mean_class_acc,
+     valid_mean_iou_index,
+     test_global_acc,
+     test_mean_class_acc,
+     test_mean_iou_index) = best
+
+    print("")
+    print("Global Accuracies:")
     print('Best: Train {:.5f} Valid {:.5f} Test {:.5f}'.format(
-        best[0], best[3], best[6]))
-    print("Test Mean Class Accuracy: {}".format(best[7]))
-    print("Test Mean Intersection Over Union: {}".format(best[8]))
+        train_global_acc, valid_global_acc, test_global_acc))
+
+    print('Best: Mean Class Accuracy - Train {:.5f} Valid {:.5f} '
+          'Test {:.5f}'.format(train_mean_class_acc,
+                               valid_mean_class_acc,
+                               test_mean_class_acc))
+
+    print('Best: Mean Class iou - Train {:.5f} Valid {:.5f} '
+          'Test {:.5f}'.format(train_mean_iou_index,
+                               valid_mean_iou_index,
+                               test_mean_iou_index))
+    print("")
 
     if len(saveto) != 1:
         print("Moving temporary model files to {}".format(saveto[1]))
@@ -1088,7 +1097,6 @@ def show_seg(dataset_name, n_exp, dataset_set, mode='sequential', id=-1):
     :return:
     """
 
-    load_from_file = True
     # load options
     model_filename = 'model_recseg_' + dataset_name + n_exp + ".npz"
     try:
