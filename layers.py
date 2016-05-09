@@ -586,21 +586,21 @@ class ReNetLayer(lasagne.layers.Layer):
             (batch_size, cchannels, npatchesH, pheight, npatchesW, pwidth),
             name=self.name + "_pre_reshape0")
 
-        # #W, bs, #H, ph, pw, cc
+        # bs, #H, #W, ph, pw, cc
         l_in = lasagne.layers.DimshuffleLayer(
             l_in,
-            (4, 0, 2, 3, 5, 1),
+            (0, 2, 4, 3, 5, 1),
             name=self.name + "_pre_dimshuffle0")
 
         # FIRST SUBLAYER
         # The RNN Layer needs a 3D tensor input: bs*#H, #W, psize
-        # #W, bs*#H, ph * pw * cc
+        # bs*#H, #W, ph * pw * cc
         l_sub0 = lasagne.layers.ReshapeLayer(
             l_in,
-            (npatchesW, -1, psize),
+            (-1, npatchesW, psize),
             name=self.name + "_sub0_reshape0")
 
-        # Left/right scan: #W, bs*#H, 2*hid
+        # Left/right scan: bs*#H, #W, 2*hid
         l_sub0 = BidirectionalRNNLayer(
             l_sub0,
             n_hidden,
@@ -627,40 +627,51 @@ class ReNetLayer(lasagne.layers.Layer):
             rnn_b=rnn_b,
             name=self.name + "_sub0_renetsub")
 
-        # Revert reshape: #W, bs, #H, 2*hid
+        # Revert reshape: bs, #H, #W, 2*hid
         l_sub0 = lasagne.layers.ReshapeLayer(
             l_sub0,
-            (npatchesW, batch_size, npatchesH, 2 * n_hidden),
+            (batch_size, npatchesH, npatchesW, 2 * n_hidden),
             name=self.name + "_sub0_unreshape")
 
-        # Invert rows and columns: #H, bs, #W, 2*hid
-        l_sub0 = lasagne.layers.DimshuffleLayer(
-            l_sub0,
-            (2, 1, 0, 3),
-            name=self.name + "_sub0_undimshuffle")
+        # # Invert rows and columns: #H, bs, #W, 2*hid
+        # l_sub0 = lasagne.layers.DimshuffleLayer(
+        #     l_sub0,
+        #     (2, 1, 0, 3),
+        #     name=self.name + "_sub0_undimshuffle")
 
         # If stack_sublayers is True, the second sublayer takes as an input the
         # first sublayer's output, otherwise the input of the ReNetLayer (e.g
         # the image)
         if stack_sublayers:
-            # #H, bs, #W, 2*hid
+            # bs, #H, #W, 2*hid
             input_sublayer1 = l_sub0
             psize = 2 * n_hidden
         else:
-            # #H, bs, #W, ph, pw, cc
-            l_in = lasagne.layers.DimshuffleLayer(
+            #     # #H, bs, #W, ph, pw, cc
+            #     input_sublayer1 = lasagne.layers.DimshuffleLayer(
+            #         l_in,
+            #         (2, 1, 0, 3, 4, 5),
+            #         name=self.name + "_presub1_in_dimshuffle")
+            # bs, #H, #W, ph*pw*cc
+            input_sublayer1 = lasagne.layers.ReshapeLayer(
                 l_in,
-                (2, 1, 0, 3, 4, 5),
+                (batch_size, npatchesH, npatchesW, psize),
                 name=self.name + "_presub1_in_dimshuffle")
 
         # SECOND SUBLAYER
-        # The RNN Layer needs a 3D tensor input: #H, bs*#W, psize
-        l_sub1 = lasagne.layers.ReshapeLayer(
+        # Invert rows and columns: bs, #W, #H, psize
+        l_sub1 = lasagne.layers.DimshuffleLayer(
             input_sublayer1,
-            (npatchesH, -1, psize),
+            (0, 2, 1, 3),
+            name=self.name + "_presub1_dimshuffle")
+
+        # The RNN Layer needs a 3D tensor input: bs*#W, #H, psize
+        l_sub1 = lasagne.layers.ReshapeLayer(
+            l_sub1,
+            (-1, npatchesH, psize),
             name=self.name + "_sub1_reshape")
 
-        # Down/up scan: #H, bs*#W, 2*hid
+        # Down/up scan: bs*#W, #H, 2*hid
         l_sub1 = BidirectionalRNNLayer(
             l_sub1,
             n_hidden,
@@ -687,11 +698,17 @@ class ReNetLayer(lasagne.layers.Layer):
             name=self.name + "_sub1_renetsub")
         psize = 2 * n_hidden
 
-        # Revert the reshape: #H, bs, #W, 2*hid
+        # Revert the reshape: bs, #W, #H, 2*hid
         l_sub1 = lasagne.layers.ReshapeLayer(
             l_sub1,
-            (npatchesH, batch_size, npatchesW, psize),
+            (batch_size, npatchesW, npatchesH, psize),
             name=self.name + "_sub1_unreshape")
+
+        # Invert rows and columns: bs, #H, #W, psize
+        l_sub1 = lasagne.layers.DimshuffleLayer(
+            l_sub1,
+            (0, 2, 1, 3),
+            name=self.name + "_sub1_undimshuffle")
 
         # Concat all 4 layers if needed: #H, bs, #W, {2,4}*hid
         if not stack_sublayers:
