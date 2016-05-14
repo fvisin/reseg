@@ -710,14 +710,14 @@ class ReNetLayer(lasagne.layers.Layer):
             (0, 2, 1, 3),
             name=self.name + "_sub1_undimshuffle")
 
-        # Concat all 4 layers if needed: #H, bs, #W, {2,4}*hid
+        # Concat all 4 layers if needed: bs, #H, #W, {2,4}*hid
         if not stack_sublayers:
             l_sub1 = lasagne.layers.ConcatLayer([l_sub0, l_sub1], axis=3)
 
         # Get back to bc01: bs, psize, #H, #W
         self.out_layer = lasagne.layers.DimshuffleLayer(
             l_sub1,
-            (1, 3, 0, 2),
+            (0, 3, 1, 2),
             name=self.name + "_out_undimshuffle")
 
         # HACK LASAGNE
