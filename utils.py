@@ -64,38 +64,7 @@ def validate(f_pred,
              saveto='test_lasagne',
              mean=None, std=None, fullmasks=None,
              filenames=None, folder_dataset='pred'):
-    """validate
-
-    Parameters
-    ----------
-    f_pred :
-        The theano function that make the prediction
-    data :
-        The
-    batchsize :
-        The
-    has_void:
-        In some dataset there are some unlabeled pixels that we don't consider
-        in the metrics evaluation
-    nclasses :
-        The
-    samples_ids :
-        The
-    dataset :
-        The
-    saveto :
-        The
-    mean :
-        The
-    std :
-        The
-    fullmasks :
-        The
-    filenames :
-        The
-    folder_dataset :
-        Where to save the segmentation masks. Has to be either 'train',
-        'valid' or 'test'
+    """Validate the model
 
     Returns
     -------

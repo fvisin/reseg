@@ -1267,15 +1267,13 @@ def show_seg(dataset_name, n_exp, dataset_set, mode='sequential', id=-1):
 
     # Class balancing
     # ---------------
-    # TODO: check if it works...
     w_freq = 1
     if class_balance in ['median_freq_cost', 'rare_freq_cost']:
+        # Get labels ids and number of pixels per label
         u_train, c_train = np.unique(y_train, return_counts=True)
-        priors = c_train.astype(theano.config.floatX) / train[1].size
 
-        # the denominator is computed by summing the total number
+        # The denominator is computed by summing the total number
         # of pixels of the images where the class is present
-        # so it should be even more balanced
         px_count = np.zeros(u_train.shape)
         for tt in y_train:
             u_tt = np.unique(tt)
