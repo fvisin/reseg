@@ -1,12 +1,6 @@
 from collections import OrderedDict
-from itertools import izip
-import os
 
-import matplotlib as mpl
-import matplotlib.pyplot as plt
-import matplotlib.cm as cm
 import numpy as np
-import scipy.io as sio
 
 
 # COLORMAPS
@@ -31,28 +25,6 @@ cmaps = [('Perceptually Uniform Sequential',
                              'gist_rainbow', 'hsv', 'flag', 'prism'])]
 
 
-# ##### DAIMLER ##### #
-colormap_daimler = OrderedDict([
-    (0, np.array([128, 64, 128], dtype=np.uint8)),  # ground
-    (1, np.array([64, 0, 128], dtype=np.uint8)),  # vehicle
-    (2, np.array([64, 64, 0], dtype=np.uint8)),  # pedestrian
-    (3, np.array([128, 128, 128], dtype=np.uint8)),  # sky
-    (4, np.array([128, 0, 0], dtype=np.uint8)),  # building
-    (5, np.array([0, 0, 0], dtype=np.uint8))  # Unlabeled
-    ])
-
-headers_daimler = ["Ground", "Vehicle", "Pedestrian", "Sky",
-                   "Building", "Void"]
-
-# ##### KITTI ROAD ##### #
-colormap_kitti_road = OrderedDict([
-    (0, np.array([128, 64, 128], dtype=np.uint8)),  # non road
-    (1, np.array([64, 0, 128], dtype=np.uint8)),  # road
-    (2, np.array([0, 0, 0], dtype=np.uint8))  # Unlabeled
-    ])
-
-headers_kitti_road = ["Road", "Non-road", "Void"]
-
 # ##### CAMVID ##### #
 colormap_camvid = OrderedDict([
     (0, np.array([128, 128, 128], dtype=np.uint8)),  # sky
@@ -73,212 +45,13 @@ headers_camvid = ["Sky", "Building", "Column_Pole", "Road", "Sidewalk",
                   "Tree", "SignSymbol", "Fence", "Car", "Pedestrian",
                   "Bicyclist", "Void"]
 
- ##### CITYSCAPES ##### #
-colormap_cityscapes = OrderedDict([
-    (0, np.array([128, 64, 128], dtype=np.uint8)),   # road
-    (1, np.array([244, 35, 232], dtype=np.uint8)),  # sidewalk
-    (2, np.array([70, 70, 70], dtype=np.uint8)),  # building
-    (3, np.array([102, 102, 156], dtype=np.uint8)),  # wall
-    (4, np.array([190, 153, 153], dtype=np.uint8)),  # fence
-    (5, np.array([153, 153, 153], dtype=np.uint8)),  # pole
-    (6, np.array([250, 170, 30], dtype=np.uint8)),  # traffic light
-    (7, np.array([220, 220,  0], dtype=np.uint8)),  # traffic sign
-    (8, np.array([107, 142, 35], dtype=np.uint8)),  # vegetation
-    (9, np.array([152, 251, 152], dtype=np.uint8)),  # terrain
-    (10, np.array([70, 130,180], dtype=np.uint8)),  # sky
-    (11, np.array([220, 20, 60], dtype=np.uint8)),  # person
-    (12, np.array([19, 0,  0], dtype=np.uint8)),   # rider
-    (13, np.array([0, 0, 142], dtype=np.uint8)),  # car
-    (14, np.array([0, 0, 70], dtype=np.uint8)),  # truck
-    (15, np.array([0, 60, 100], dtype=np.uint8)),  # bus
-    (16, np.array([0, 80, 100], dtype=np.uint8)),  # train
-    (17, np.array([0, 0, 230], dtype=np.uint8)),  # motorcycle
-    (18, np.array([119, 11, 32], dtype=np.uint8)),  # bycicle
-    (19, np.array([0, 0, 0], dtype=np.uint8))  # void
-])
-
-headers_cityscapes = ["Road", "Sidewalk", "Building", "Wall", "Fence",
-                      "Pole", "TrafficLight", "TrafficSign", "Vegetation",
-                      "Terrain", "Sky", "Person", "Rider", "Car", "Truck",
-                      "Bus", "Train", "Motorcycle", "Bycicle", "Void"]
-
-# ##### FASHIONISTA ##### #
-colormap_fashionista = OrderedDict([
-    (0, np.array([128, 128, 128], dtype=np.uint8)),
-    (1, np.array([128, 0, 0], dtype=np.uint8)),
-    (2, np.array([192, 192, 128], dtype=np.uint8)),
-    (3, np.array([128, 64, 128], dtype=np.uint8)),
-    (4, np.array([0, 0, 192], dtype=np.uint8)),
-    (5, np.array([128, 128, 0], dtype=np.uint8)),
-    (6, np.array([192, 128, 128], dtype=np.uint8)),
-    (7, np.array([64, 64, 128], dtype=np.uint8)),
-    (8, np.array([64, 0, 128], dtype=np.uint8)),
-    (9, np.array([64, 64, 0], dtype=np.uint8)),
-    (10, np.array([0, 128, 192], dtype=np.uint8)),
-    (11, np.array([0, 0, 0], dtype=np.uint8)),
-    (12, np.array([128, 128, 128], dtype=np.uint8)),
-    (13, np.array([128, 0, 0], dtype=np.uint8)),
-    (14, np.array([192, 192, 128], dtype=np.uint8)),
-    (15, np.array([128, 64, 128], dtype=np.uint8)),
-    (16, np.array([0, 0, 192], dtype=np.uint8)),
-    (17, np.array([128, 128, 0], dtype=np.uint8)),
-    (18, np.array([192, 128, 128], dtype=np.uint8)),
-    (19, np.array([64, 64, 128], dtype=np.uint8)),
-    (20, np.array([64, 0, 128], dtype=np.uint8)),
-    (21, np.array([64, 64, 0], dtype=np.uint8)),
-    (22, np.array([0, 128, 192], dtype=np.uint8)),
-    (23, np.array([0, 0, 0], dtype=np.uint8)),
-    (24, np.array([128, 128, 128], dtype=np.uint8)),
-    (25, np.array([128, 0, 0], dtype=np.uint8)),
-    (26, np.array([192, 192, 128], dtype=np.uint8)),
-    (27, np.array([128, 64, 128], dtype=np.uint8)),
-    (28, np.array([0, 0, 192], dtype=np.uint8)),
-    (29, np.array([128, 128, 0], dtype=np.uint8)),
-    (30, np.array([192, 128, 128], dtype=np.uint8)),
-    (31, np.array([64, 64, 128], dtype=np.uint8)),
-    (32, np.array([64, 0, 128], dtype=np.uint8)),
-    (33, np.array([64, 64, 0], dtype=np.uint8)),
-    (34, np.array([0, 128, 192], dtype=np.uint8)),
-    (35, np.array([0, 0, 0], dtype=np.uint8)),
-    (36, np.array([128, 128, 128], dtype=np.uint8)),
-    (37, np.array([128, 0, 0], dtype=np.uint8)),
-    (38, np.array([192, 192, 128], dtype=np.uint8)),
-    (39, np.array([128, 64, 128], dtype=np.uint8)),
-    (40, np.array([0, 0, 192], dtype=np.uint8)),
-    (41, np.array([128, 128, 0], dtype=np.uint8)),
-    (42, np.array([192, 128, 128], dtype=np.uint8)),
-    (43, np.array([64, 64, 128], dtype=np.uint8)),
-    (44, np.array([64, 0, 128], dtype=np.uint8)),
-    (45, np.array([64, 64, 0], dtype=np.uint8)),
-    (46, np.array([0, 128, 192], dtype=np.uint8)),
-    (47, np.array([0, 0, 0], dtype=np.uint8)),
-    (48, np.array([128, 128, 128], dtype=np.uint8)),
-    (49, np.array([128, 0, 0], dtype=np.uint8)),
-    (50, np.array([192, 192, 128], dtype=np.uint8)),
-    (51, np.array([128, 64, 128], dtype=np.uint8)),
-    (52, np.array([0, 0, 192], dtype=np.uint8)),
-    (53, np.array([128, 128, 0], dtype=np.uint8)),
-    (54, np.array([192, 128, 128], dtype=np.uint8)),
-    (55, np.array([64, 64, 128], dtype=np.uint8)),
-    (56, np.array([64, 0, 128], dtype=np.uint8)),
-    ])
-
-
-# ##### FLOWERS ##### #
-# ---------------------
-colormap_flowers = OrderedDict([
-    (0, np.array([128, 64, 128], dtype=np.uint8)),
-    (1, np.array([64, 0, 128], dtype=np.uint8)),
-    ])
-
-
-# ##### HORSES ##### #
-# --------------------
-colormap_horses = OrderedDict([
-    (0, np.array([255, 255, 255], dtype=np.uint8)),  # Horse
-    (1, np.array([0, 0, 0], dtype=np.uint8))  # Unlabeled
-    ])
-
-headers_horses = ["Horses", "Non-horses"]
-
-# ##### NYU DEPTH ##### #
-# ----------------------
-# 40 classes
-nclasses = 41
-color_bins = np.linspace(0, 1, nclasses)
-norm = mpl.colors.Normalize(vmin=0, vmax=1)
-m = cm.ScalarMappable(norm=norm, cmap=plt.get_cmap('Pastel2'))
-colormap_nyu_depth40 = m.to_rgba(color_bins)[:, :3]
-
-path_mapping = os.path.join(
-    os.path.expanduser('~/exp/datasets/nyu_depth_v2/'),
-    'eccv14-data',
-    'benchmarkData',
-    'metadata',
-    'classMapping40.mat'
-)
-
-try:
-    f = sio.loadmat(path_mapping,
-                    squeeze_me=True,
-                    struct_as_record=False)
-    headers_nyu_depth40 = np.append(
-        [ff.encode("utf-8") for ff in f['className']], "Void").tolist()
-except IOError:
-    headers_nyu_depth40 = []
-
-
-# 4 Super Class
-nclasses = 5
-color_bins = np.linspace(0, 1, nclasses)
-norm = mpl.colors.Normalize(vmin=0, vmax=1)
-m = cm.ScalarMappable(norm=norm, cmap=plt.get_cmap('Pastel2'))
-colormap_nyu_depth04 = m.to_rgba(color_bins)[:, :3]
-
-path_mapping = os.path.join(
-    os.path.expanduser('~/exp/datasets/nyu_depth_v2/'),
-    'eccv14-data',
-    'benchmarkData',
-    'metadata',
-    'classMapping04.mat'
-)
-
-try:
-    f = sio.loadmat(path_mapping,
-                    squeeze_me=True,
-                    struct_as_record=False)
-    headers_nyu_depth04 = np.append(
-        [ff.encode("utf-8") for ff in f['className']], "Void").tolist()
-except IOError:
-    headers_nyu_depth04 = []
-
-
-# ##### SUNRGBD ##### #
-# --------------------
-# 37 classes + 1
-nclasses = 38
-color_bins = np.linspace(0, 1, nclasses)
-norm = mpl.colors.Normalize(vmin=0, vmax=1)
-m = cm.ScalarMappable(norm=norm, cmap=plt.get_cmap('Set1'))
-colormap_sunrgbd = m.to_rgba(color_bins)[:, :3]
-
-path_classlabels = os.path.join(
-    os.path.expanduser('~/exp/datasets/SUNRGBD/'),
-    'SUNRGBDtoolbox/Metadata/seg37list.mat')
-
-try:
-    f = sio.loadmat(path_classlabels,
-                    squeeze_me=True,
-                    struct_as_record=False)
-    headers_sunrgbd = np.append(
-        [ff.encode("utf-8") for ff in f['seg37list']], "Void").tolist()
-except IOError:
-    headers_sunrgbd = []
-
 # DATASET DICTIONARIES #
 colormap_datasets = dict()
 colormap_datasets["camvid"] = colormap_camvid
-colormap_datasets["cityscapes"] = colormap_cityscapes
-colormap_datasets["daimler"] = colormap_daimler
-colormap_datasets["fashionista"] = colormap_fashionista
-colormap_datasets["flowers"] = colormap_flowers
-colormap_datasets["horses"] = colormap_horses
-colormap_datasets["kitti_road"] = colormap_kitti_road
 
 for key, value in colormap_datasets.iteritems():
     colormap_datasets[key] = np.asarray(
                     [z for z in zip(*value.items())[1]]) / 255.
 
-colormap_datasets.update({'nyu_depth04': colormap_nyu_depth04})
-colormap_datasets.update({'nyu_depth40': colormap_nyu_depth40})
-colormap_datasets.update({'sunrgbd': colormap_sunrgbd})
-
 headers_datasets = dict()
 headers_datasets["camvid"] = headers_camvid
-headers_datasets["cityscapes"] = headers_cityscapes
-headers_datasets["daimler"] = headers_daimler
-headers_datasets["kitti_road"] = headers_kitti_road
-headers_datasets["horses"] = headers_horses
-headers_datasets["nyu_depth04"] = headers_nyu_depth04
-headers_datasets["nyu_depth40"] = headers_nyu_depth40
-headers_datasets["sunrgbd"] = headers_sunrgbd

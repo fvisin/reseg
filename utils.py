@@ -7,7 +7,7 @@ import numpy as np
 from progressbar import Bar, FormatLabel, Percentage, ProgressBar, Timer
 from progressbar.widgets import FormatWidgetMixin, WidthWidgetMixin
 from retrying import retry
-from skimage import img_as_float, img_as_ubyte
+from skimage import img_as_ubyte
 from sklearn.metrics import confusion_matrix
 from skimage.color import label2rgb, gray2rgb
 from skimage.io import imsave
@@ -83,9 +83,6 @@ def validate(f_pred,
     seg_path = os.path.join('segmentations', dataset,
                             saveto.split('/')[-1][:-4])
 
-    # hack for nyu because now I don't have the time to better think
-    if dataset == 'nyu_depth':
-        dataset = 'nyu_depth40' if nclasses == 41 else 'nyu_depth04'
     try:
         colormap = colormap_datasets[dataset]
     except KeyError:

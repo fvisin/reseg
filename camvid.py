@@ -1,24 +1,16 @@
 from __future__ import division
 import os
 from collections import OrderedDict
-import ctypes
 import numpy as np
 
-import scipy.io as sio
-from skimage import exposure
-from skimage import io
-from skimage import img_as_float, img_as_ubyte, img_as_uint, img_as_int
-from skimage.color import label2rgb, rgb2hsv, hsv2rgb
-from skimage.io import ImageCollection, imsave
+from skimage import img_as_ubyte
+from skimage.color import label2rgb, rgb2hsv
+from skimage.io import ImageCollection
 from skimage.transform import resize
 from itertools import izip
 
 from config_datasets import (colormap_datasets as colors_list)
-from helper_dataset import zero_pad, \
-    compare_mask_image_filenames, convert_RGB_mask_to_index, \
-    rgb2illumination_invariant, save_image
-
-import cityscapes
+from helper_dataset import convert_RGB_mask_to_index, save_image
 
 N_DEBUG = -5
 DEBUG_SAVE_IMG = False
@@ -33,8 +25,6 @@ def properties():
         # 'rereorder': [0, 1, 2]
         'has_void_class': True
     }
-
-
 
 
 """
@@ -282,7 +272,7 @@ def load_dataset_camvid_segnet(path):
 
 
 def load_data(
-    path=os.path.expanduser('~/exp/datasets/camvid/'),
+    path=os.path.expanduser('./datasets/camvid/'),
     randomize=False,
     resize_images=True,
     resize_size=[320, 240],  # w x h : 960x720, 480x360, 320x240
@@ -298,7 +288,6 @@ def load_data(
     compute_stats='all',
     rng=None,
     with_fullmasks=False,
-    cityscape_train=False,
     **kwargs
 ):
     """Dataset loader
@@ -330,33 +319,13 @@ def load_data(
          mask_val_segnet,
          filenames_val_segnet) = load_dataset_camvid_segnet(path)
 
-        if cityscape_train:
-            (img_train,
-             mask_train,
-             filenames_train,
-             img_val,
-             mask_val,
-             filenames_val) = cityscapes.load_resized_trainval_cityscapes(
-                os.path.expanduser('~/exp/datasets/cityscapes/'),
-                True
-            )
+        img_train = img_train_segnet
+        mask_train = mask_train_segnet
+        filenames_train = filenames_train_segnet
 
-            img_train.extend(img_train_segnet)
-            mask_train.extend(mask_train_segnet)
-            filenames_train.extend(filenames_train_segnet)
-
-            img_val.extend(img_val_segnet)
-            mask_val.extend(mask_val_segnet)
-            filenames_val.extend(filenames_val_segnet)
-        else:
-            img_train = img_train_segnet
-            mask_train = mask_train_segnet
-            filenames_train = filenames_train_segnet
-
-            img_val = img_val_segnet
-            mask_val = mask_val_segnet
-            filenames_val = filenames_val_segnet
-
+        img_val = img_val_segnet
+        mask_val = mask_val_segnet
+        filenames_val = filenames_val_segnet
 
     elif version == 'standard':
         path = os.path.join(path, 'splitted_960x720')
@@ -368,22 +337,17 @@ def load_data(
          filenames_test,
          img_val,
          mask_val,
-         filenames_val) = load_dataset_camvid(path,
-                                              resize_images=resize_images,
-                                              resize_size=resize_size,
-                                              load_greylevel_mask=
-                                              load_greylevel_mask,
-                                              classes=classes,
-                                              save=save,
-                                              color_space=color_space
-                                              )
+         filenames_val) = load_dataset_camvid(
+             path, resize_images=resize_images, resize_size=resize_size,
+             load_greylevel_mask=load_greylevel_mask, classes=classes,
+             save=save, color_space=color_space)
 
-    if compute_stats == 'all':
-        images = np.asarray(img_train + img_val + img_test)
-    elif compute_stats == 'train':
-        images = np.asarray(img_train)
+    # if compute_stats == 'all':
+    #     images = np.asarray(img_train + img_val + img_test)
+    # elif compute_stats == 'train':
+    #     images = np.asarray(img_train)
 
-    # all images have the same dimension --> we can compute per pixel statistics
+    # all images have the same dimension --> we can compute perpixel statistics
     # mean = images.mean(axis=0)[np.newaxis, ...]
     # std = np.maximum(images.std(axis=0), 1e-8)[np.newaxis, ...]
     # print "Computing dataset statistics ..."

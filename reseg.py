@@ -26,15 +26,6 @@ from utils import iterate_minibatches, save_with_retry, validate, VariableText
 # Datasets import
 # TODO these should go into preprocess/helper dataset/evaluate
 import camvid
-import daimler
-import fashionista
-import flowers
-import horses
-import kitti_road
-import mscoco
-import nyu_depth
-import sunrgbd
-import cityscapes
 
 floatX = theano.config.floatX
 intX = 'uint8'
@@ -42,16 +33,7 @@ intX = 'uint8'
 debug = False
 nanguard = False
 
-datasets = {'camvid': (camvid.load_data, camvid.properties),
-            'daimler': (daimler.load_data, daimler.properties),
-            'fashionista': (fashionista.load_data, fashionista.properties),
-            'flowers': (flowers.load_data, flowers.properties),
-            'horses': (horses.load_data, horses.properties),
-            'kitti_road': (kitti_road.load_data, kitti_road.properties),
-            'mscoco': (mscoco.load_data, mscoco.properties),
-            'nyu_depth': (nyu_depth.load_data, nyu_depth.properties),
-            'sunrgbd': (sunrgbd.load_data, sunrgbd.properties),
-            'cityscapes': (cityscapes.load_data, cityscapes.properties)}
+datasets = {'camvid': (camvid.load_data, camvid.properties)}
 
 
 def get_dataset(name):

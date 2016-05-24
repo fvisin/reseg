@@ -6,7 +6,3 @@ evaluate*
 *.pkl
 
 !evaluate_camvid.py
-!evaluate_fashionista.py
-!evaluate_flowers.py
-!evaluate_horses.py
-!evaluate_mscoco.py
