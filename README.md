@@ -4,15 +4,15 @@ This repository contains the code for the following papers:
         Courville, Yoshua Bengio - [ReNet: A Recurrent Neural Network Based
         Alternative to Convolutional Networks](
         https://arxiv.org/pdf/1505.00393.pdf) ([BibTeX](
-        https://github.com/fvisin/reseg/reseg.bib)) 
+        https://scholar.google.it/scholar.bib?q=info:ZUE20uoSIzcJ:scholar.google.com/&output=citation&scisig=AAGBfm0AAAAAV0XzMYPJjoJeUCn69TuCoJkSaHSAOnCj&scisf=4&hl=en))
 
 * \[2\] Francesco Visin, Kyle Kastner, Aaron Courville, Yoshua Bengio, Matteo
         Matteucci, Kyunghyun Cho - [ReSeg: A Recurrent Neural Network for
         Object Segmentation](http://arxiv.org/pdf/1511.07053) ([BibTeX](
-        https://github.com/fvisin/reseg/reseg.bib))
+        https://scholar.google.it/scholar.bib?q=info:LHt-RjBaDBEJ:scholar.google.com/&output=citation&scisig=AAGBfm0AAAAAV0XywMgiCDP11cRAVEyL5otAP2YnQMdo&scisf=4&hl=en)) 
 
 Setup
----------------------
+-----
 
 #### Install Theano
 
@@ -28,11 +28,17 @@ http://mi.eng.cam.ac.uk/research/projects/VideoRec/CamVid/
 The program expects to find the dataset data in `./datasets/camvid/`. You can
 change this path modifying `camvid.py` if you want.
 
+#### Download the VGG-16 weights
+Download the VGG weights for Lasagne from:
+https://s3.amazonaws.com/lasagne/recipes/pretrained/imagenet/vgg16.pkl
+
+Once downloaded, rename them as `w_vgg16.pkl` and put them in the root
+directory of this code.
 
 Reproducing the Results
----------------------
+-----------------------
 
-To reproduce the results of the ReSeg paper run `python eval_camvid.py`.  
+To reproduce the results of the ReSeg paper run `python evaluate_camvid.py`.
 Make sure to set the appropriate THEANO_FLAGS to run the model on your machine
 (most probably `export THEANO_FLAGS=device=gpu,floatX=float32`)
 
