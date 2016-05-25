@@ -2,9 +2,8 @@ from collections import Iterable
 
 import numpy as np
 import lasagne
-from lasagne.layers import get_all_layers, get_output, get_output_shape
-from lasagne.layers.conv import TransposeConv2DLayer as DeconvLayer
-from theano.sandbox.cuda.basic_ops import gpu_contiguous
+from lasagne.layers import get_output, get_output_shape
+from lasagne.layers.conv import TransposedConv2DLayer
 import theano.tensor as T
 
 from padded import DynamicPaddingLayer, PaddedConv2DLayer as ConvLayer
@@ -328,7 +327,7 @@ class ReSegLayer(lasagne.layers.Layer):
             l_upsampling = l_renet
             for l in range(nlayers):
                 target_shape = target_shape * up_ratio
-                l_upsampling = DeconvLayer(
+                l_upsampling = TransposedConv2DLayer(
                     l_upsampling,
                     num_filters=out_nfilters[l],
                     filter_size=filter_size,
@@ -346,7 +345,7 @@ class ReSegLayer(lasagne.layers.Layer):
                     out_nfilters[l], out_shape))
 
                 # CROP
-                # pad in DeconvLayer cannot be a tensor --> we cannot
+                # pad in TransposeConv2DLayer cannot be a tensor --> we cannot
                 # crop unless we know in advance by how much!
                 crop = T.max(T.stack([up_shape - target_shape, T.zeros(2)]),
                              axis=0)
@@ -364,12 +363,12 @@ class ReSegLayer(lasagne.layers.Layer):
             l_upsampling = l_renet
             for i, (nf, f_size, stride) in enumerate(zip(
                     out_nfilters, out_filters_size, out_filters_stride)):
-                l_upsampling = DeconvLayer(
+                l_upsampling = TransposedConv2DLayer(
                     l_upsampling,
                     num_filters=nf,
                     filter_size=f_size,
                     stride=stride,
-                    pad=0,
+                    crop=0,
                     W=out_W_init,
                     b=out_b_init,
                     nonlinearity=out_nonlinearity)
@@ -986,104 +985,6 @@ class LinearUpsamplingLayer(lasagne.layers.Layer):
                 input_shape[1] * self.expand_height,
                 input_shape[2] * self.expand_width,
                 self.nclasses)
-
-
-class asdDeconvLayer(lasagne.layers.Layer):
-    """An upsampling Layer that transposes a convolution
-
-    This layer upsamples its input using the transpose of a convolution,
-    also known as fractional convolution in some contexts.
-
-    Notes
-    -----
-    Expects the input to be in format: batchsize, channels, rows, cols
-    """
-    def __init__(self, incoming, num_filters, filter_size, stride=1, pad=0,
-                 untie_biases=False, W=lasagne.init.GlorotUniform(),
-                 b=lasagne.init.Constant(0.), nonlinearity=None,
-                 flip_filters=False, **kwargs):
-        super(asdDeconvLayer, self).__init__(incoming, **kwargs)
-        self.num_filters = num_filters
-        self.filter_size = lasagne.utils.as_tuple(filter_size, 2, int)
-        self.stride = lasagne.utils.as_tuple(stride, 2, int)
-        self.pad = lasagne.utils.as_tuple(pad, 2, int)
-        self.untie_biases = untie_biases
-        self.flip_filters = flip_filters
-        W_shape = (self.input_shape[1], num_filters) + self.filter_size
-        self.W_shape = W_shape
-        self.W = self.add_param(W, W_shape, name="W")
-        if b is None:
-            self.b = None
-        else:
-            if self.untie_biases:
-                biases_shape = (num_filters, self.output_shape[2],
-                                self.output_shape[3])
-            else:
-                biases_shape = (num_filters,)
-            self.b = self.add_param(b, biases_shape, name="b",
-                                    regularizable=False)
-
-        if nonlinearity is None:
-            nonlinearity = lasagne.nonlinearities.identity
-        self.nonlinearity = nonlinearity
-
-    def get_output_shape_for(self, input_shape):
-        batch_size = input_shape[0]
-        pad = self.pad if isinstance(self.pad, tuple) else (self.pad,) * 2
-
-        output_rows = get_deconv_size(input_shape[2],
-                                      self.filter_size[0],
-                                      self.stride[0],
-                                      pad[0])
-
-        output_columns = get_deconv_size(input_shape[3],
-                                         self.filter_size[1],
-                                         self.stride[1],
-                                         pad[1])
-
-        return (batch_size, self.num_filters, output_rows, output_columns)
-
-    def get_output_for(self, input_arr, **kwargs):
-        filters = gpu_contiguous(self.W)
-        input_arr = gpu_contiguous(input_arr)
-        in_shape = get_output(self.input_layer).shape
-        out_shape = get_deconv_size(in_shape[2:], self.filter_size,
-                                    self.stride, self.pad)
-
-        op = T.nnet.abstract_conv.AbstractConv2d_gradInputs(
-            imshp=(None,) * 4,
-            kshp=self.W_shape,
-            border_mode=self.pad,
-            subsample=self.stride,
-            filter_flip=self.flip_filters)
-        grad = op(filters, input_arr, out_shape)
-
-        if self.b is None:
-            activation = grad
-        elif self.untie_biases:
-            activation = grad + self.b.dimshuffle('x', 0, 1, 2)
-        else:
-            activation = grad + self.b.dimshuffle('x', 0, 'x', 'x')
-        return self.nonlinearity(activation)
-
-
-def get_deconv_size(input_size, filter_size, stride, pad):
-    if input_size is None:
-        return None
-    input_size = np.array(input_size)
-    filter_size = np.array(filter_size)
-    stride = np.array(stride)
-    if isinstance(pad, (int, Iterable)) and not isinstance(pad, str):
-        pad = np.array(pad)
-        output_size = (input_size - 1) * stride + filter_size - 2*pad
-
-    elif pad == 'full':
-        output_size = input_size * stride - filter_size - stride + 2
-    elif pad == 'valid':
-        output_size = (input_size - 1) * stride + filter_size
-    elif pad == 'same':
-        output_size = input_size
-    return output_size
 
 
 class CropLayer(lasagne.layers.Layer):
