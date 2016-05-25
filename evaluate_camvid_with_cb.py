@@ -184,7 +184,7 @@ if __name__ == '__main__':
 
         # Prediction, Softmax
         'intermediate-pred': None,
-        'class-balance': None,
+        'class-balance': 'median_freq_cost',
 
         # Special layers
         'batch-norm': False,

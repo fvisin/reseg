@@ -38,9 +38,10 @@ directory of this code.
 Reproducing the Results
 -----------------------
 
-To reproduce the results of the ReSeg paper run `python evaluate_camvid.py`.
-Make sure to set the appropriate THEANO_FLAGS to run the model on your machine
-(most probably `export THEANO_FLAGS=device=gpu,floatX=float32`)
+To reproduce the results of the ReSeg paper run `python evaluate_camvid.py` (or
+`python evaluate_camvid_with_cb.py` to reproduce the experiment with class
+balancing).  Make sure to set the appropriate THEANO_FLAGS to run the model on
+your machine (most probably `export THEANO_FLAGS=device=gpu,floatX=float32`)
 
 The program will output some metrics on the current minibatch iteration during
 training:
