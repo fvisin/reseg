@@ -20,6 +20,17 @@ Download Theano and make sure it's working properly.  All the
 information you need can be found by following this link:
 http://deeplearning.net/software/theano/
 
+
+#### Install other dependencies
+
+This software relies on some amazing third-party software libraries. 
+You can install them with *pip*:
+`pip install <--user> lasagne matplotlib Pillow progressbar2 pydot-ng retrying
+scikit-image scikit-learn tabulate`
+*(Use the `--user` option if you don't want to install them globally or you
+don't have sudo privileges on your machine.)*
+
+
 #### Download the CamVid dataset
 
 Download the CamVid dataset from 
@@ -28,12 +39,14 @@ http://mi.eng.cam.ac.uk/research/projects/VideoRec/CamVid/
 The program expects to find the dataset data in `./datasets/camvid/`. You can
 change this path modifying `camvid.py` if you want.
 
+
 #### Download the VGG-16 weights
 Download the VGG weights for Lasagne from:
 https://s3.amazonaws.com/lasagne/recipes/pretrained/imagenet/vgg16.pkl
 
 Once downloaded, rename them as `w_vgg16.pkl` and put them in the root
 directory of this code.
+
 
 Reproducing the Results
 -----------------------
@@ -62,3 +75,18 @@ validation and test set and save some sample images for each set in a
 At the end of the training `get_info_model.py` can be used to show some
 information on the trained model. Run `python get_info_model.py -h` for a 
 list of the arguments and their explanation.
+
+
+Acknowledgments
+---------------
+
+Many people contributed in different ways to this project. We are extremely
+thankful to the [Theano](http://deeplearning.net/software/theano/) developers
+and to many people at [MILA](http://mila.umontreal.ca/) for their support and
+for the many insightful discussions. We also thank the developer of
+[Lasagne](http://lasagne.readthedocs.io/), a powerful yet light framework on top of
+Theano. I wish I discovered it at the beginning of this project! :)
+
+Finally, our gratitude goes to the developers of all the great libraries we
+used in this project, to all the people who got involved with the project at
+any level and to our generous sponsors.
