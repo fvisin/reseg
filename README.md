@@ -6,10 +6,12 @@ This repository contains the code for the following papers:
         https://arxiv.org/pdf/1505.00393.pdf) ([BibTeX](
         https://scholar.google.it/scholar.bib?q=info:ZUE20uoSIzcJ:scholar.google.com/&output=citation&scisig=AAGBfm0AAAAAV0XzMYPJjoJeUCn69TuCoJkSaHSAOnCj&scisf=4&hl=en))
 
-* \[2\] Francesco Visin, Kyle Kastner, Aaron Courville, Yoshua Bengio, Matteo
-        Matteucci, Kyunghyun Cho - [ReSeg: A Recurrent Neural Network for
-        Object Segmentation](http://arxiv.org/pdf/1511.07053) ([BibTeX](
-        https://scholar.google.it/scholar.bib?q=info:LHt-RjBaDBEJ:scholar.google.com/&output=citation&scisig=AAGBfm0AAAAAV0XywMgiCDP11cRAVEyL5otAP2YnQMdo&scisf=4&hl=en)) 
+* \[2\] Francesco Visin, Marco Ciccone, Adriana Romero, Kyle Kastner, Kyunghyun 
+        Cho, Yoshua Bengio, Matteo Matteucci, Aaron Courville - [ReSeg: A
+        Recurrent Neural Network-based Model for Semantic Segmentation](
+        http://arxiv.org/pdf/1511.07053) ([BibTeX](
+        http://dblp.uni-trier.de/rec/bibtex/journals/corr/VisinKCBMC15))
+
 
 Setup
 -----
