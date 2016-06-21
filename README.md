@@ -1,4 +1,4 @@
-This repository contains the code for the following papers:
+If you use this code, please cite one of the following papers:
 
 * \[1\] Francesco Visin, Kyle Kastner, Kyunghyun Cho, Matteo Matteucci, Aaron
         Courville, Yoshua Bengio - [ReNet: A Recurrent Neural Network Based
@@ -77,6 +77,11 @@ validation and test set and save some sample images for each set in a
 At the end of the training `get_info_model.py` can be used to show some
 information on the trained model. Run `python get_info_model.py -h` for a 
 list of the arguments and their explanation.
+
+****
+Note: In case you want to modify this code to reproduce the results of 
+"Combining the best of convolutional layers and recurrent layers: A hybrid
+network for semantic segmentation" please let us know!
 
 
 Acknowledgments
