@@ -7,10 +7,10 @@ This repository contains the code for the following papers:
         https://scholar.google.it/scholar.bib?q=info:ZUE20uoSIzcJ:scholar.google.com/&output=citation&scisig=AAGBfm0AAAAAV0XzMYPJjoJeUCn69TuCoJkSaHSAOnCj&scisf=4&hl=en))
 
 * \[2\] Francesco Visin, Marco Ciccone, Adriana Romero, Kyle Kastner, Kyunghyun 
-        Cho, Yoshua Bengio, Matteo Matteucci, Aaron Courville - [ReSeg: A
-        Recurrent Neural Network-based Model for Semantic Segmentation](
+        Cho, Yoshua Bengio, Matteo Matteucci, Aaron Courville - [ReSeg: A Recurrent 
+        Neural Network-based Model for Semantic Segmentation](
         http://arxiv.org/pdf/1511.07053) ([BibTeX](
-        http://dblp.uni-trier.de/rec/bibtex/journals/corr/VisinKCBMC15))
+        https://scholar.google.it/scholar.bib?q=info:1kIed-WEcCkJ:scholar.google.com/&output=citation&scisig=AAGBfm0AAAAAV2mreEv3vs3R8Dyi21vpIcjVoF-V_dhx&scisf=4&hl=en))
 
 
 Setup
