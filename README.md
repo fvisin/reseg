@@ -38,8 +38,9 @@ don't have sudo privileges on your machine.)*
 Download the CamVid dataset from 
 http://mi.eng.cam.ac.uk/research/projects/VideoRec/CamVid/
 
-The program expects to find the dataset data in `./datasets/camvid/`. You can
-change this path modifying `camvid.py` if you want.
+Resize the images to 480X360 resolution. The program expects to find the 
+dataset data in `./datasets/camvid/`. You can change this path modifying 
+`camvid.py` if you want.
 
 
 #### Download the VGG-16 weights
