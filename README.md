@@ -4,13 +4,13 @@ If you use this code, please cite one of the following papers:
         Courville, Yoshua Bengio - [ReNet: A Recurrent Neural Network Based
         Alternative to Convolutional Networks](
         https://arxiv.org/pdf/1505.00393.pdf) ([BibTeX](
-        https://scholar.google.it/scholar.bib?q=info:ZUE20uoSIzcJ:scholar.google.com/&output=citation&scisig=AAGBfm0AAAAAV0XzMYPJjoJeUCn69TuCoJkSaHSAOnCj&scisf=4&hl=en))
+        https://gist.github.com/fvisin/e450c4f55a527c5db802e69574b79a95#file-renet-bib))
 
 * \[2\] Francesco Visin, Marco Ciccone, Adriana Romero, Kyle Kastner, Kyunghyun 
         Cho, Yoshua Bengio, Matteo Matteucci, Aaron Courville - [ReSeg: A Recurrent 
         Neural Network-based Model for Semantic Segmentation](
         http://arxiv.org/pdf/1511.07053) ([BibTeX](
-        https://scholar.google.it/scholar.bib?q=info:1kIed-WEcCkJ:scholar.google.com/&output=citation&scisig=AAGBfm0AAAAAV2mreEv3vs3R8Dyi21vpIcjVoF-V_dhx&scisf=4&hl=en))
+        https://gist.github.com/fvisin/61b1dd3777ea91a0e3ad963366a61fb1#file-reseg-bib))
 
 
 Setup
