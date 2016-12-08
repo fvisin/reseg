@@ -823,10 +823,10 @@ def train(saveto='model.npz',
         {'epoch': 0, 'up': 0})
     metrics_wid = VariableText(
         'Cost %(cost)f, DD %(DD)f, UD %(UD)f %(shape)s',
-        {'cost': None,
-         'DD': None,
-         'UD': None,
-         'shape': None})
+        {'cost': 0,
+         'DD': 0,
+         'UD': 0,
+         'shape': 0})
     widgets = [
         '', epochs_wid,
         ' ', metrics_wid]
